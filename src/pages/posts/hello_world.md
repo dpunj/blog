@@ -2,12 +2,12 @@
 layout: ../../layouts/MarkdownPostLayout.astro
 title: 'hello_world'
 pubDate: 2022-07-01
-description: 'This is the first post of my new Astro blog.'
+description: 'This is the first post of my new blog.'
 author: 'divesh punjabi'
 image:
     url: 'https://docs.astro.build/assets/rose.webp'
     alt: 'The Astro logo on a dark background with a pink glow.'
-tags: ["astro", "blogging", "learning in public"]
+tags: ["blogging", "learning in public"]
 ---
 
 Welcome to my blog! Here, I will share my journey as I learn how to code.
@@ -20,6 +20,6 @@ Welcome to my blog! Here, I will share my journey as I learn how to code.
 
 3. **🚀  investing & shipping**: ...
 
-## What's next
+## What's next?
 
-I will finish the Astro tutorial, and then keep adding more posts. Watch this space for more to come.
+Stay tuned...
