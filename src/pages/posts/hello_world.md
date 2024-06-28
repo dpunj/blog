@@ -1,24 +1,24 @@
 ---
+layout: ../../layouts/MarkdownPostLayout.astro
 title: 'hello_world'
 pubDate: 2022-07-01
 description: 'This is the first post of my new Astro blog.'
-author: 'Astro Learner'
+author: 'divesh punjabi'
 image:
     url: 'https://docs.astro.build/assets/rose.webp'
     alt: 'The Astro logo on a dark background with a pink glow.'
 tags: ["astro", "blogging", "learning in public"]
 ---
-# hello_world
 
 Welcome to my blog! Here, I will share my journey as I learn how to code.
 
-## What I've done before
+## What I've done before (wip)
 
-1. **👨‍🍳 cooking**: First, I created a new Astro project and set up my online accounts.
+1. **👨‍🍳 cooking**: ...
 
-2. **👔  banking & consulting**: I then learned how to make pages by creating new `.astro` files and placing them in the `src/pages/` folder.
+2. **👔  banking & consulting**: ...
 
-3. **🚀  investing & shipping**: This is my first blog post! I now have Astro pages and Markdown posts!
+3. **🚀  investing & shipping**: ...
 
 ## What's next
 
