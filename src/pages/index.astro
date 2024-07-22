@@ -4,7 +4,12 @@ import Greeting from '../components/Greeting';
 const pageTitle = "wandering 🌴"
 ---
 <BaseLayout>
-	<h2>My awesome blog subtitle</h2>
+	<h1>{pageTitle}</h1>
+	<p>Born and raised in Panama as Divesh Punjabi.</p>
+	<p>Currently living in San Francisco, CA.</p> 
+	<p>Building Versa to automate sales workflows for merchants, starting with delivery sales for restaurants in Latin America.</p>
+	<p>Using LLMs to connect services on messagging apps, starting with WhatsApp as the most widely used app globally. My long term vision, to build a platform that enables merchants and consumers, globally, to connect and interact without friction or unnecessary intermediaries.</p>
+	<p>Started this blog to share my journey as I teach myself how to code in order to build Versa. At first, I thought of getting someone technical to build most of the app for me, but along the journey I realized that I had to be the one to build it. So I became obsessed with coding. And I obsess about obsessing. And well, you get the point...</p>
 	<Greeting client:load messages={["Hej", "Hallo", "Hola", "Habari"]} />
 </BaseLayout>
 
@@ -20,11 +25,6 @@ const pageTitle = "wandering 🌴"
 		<div class ="nav-links">
 		</div>
 		<h1>{pageTitle}</h1>
-		<p>Born and raised in Panama as Divesh Punjabi.</p>
-		<p>Currently living in San Francisco, CA.</p> 
-		<p>Building Versa to automate sales workflows for merchants, starting with delivery sales for restaurants in Latin America.</p>
-		<p>Using LLMs to connect services on messagging apps, starting with WhatsApp as the most widely used app globally. My long term vision, to build a platform that enables merchants and consumers, globally, to connect and interact without friction or unnecessary intermediaries.</p>
-		<p>Started this blog to share my journey as I teach myself how to code in order to build Versa. At first, I thought of getting someone technical to build most of the app for me, but along the journey I realized that I had to be the one to build it. So I became obsessed with coding. And I obsess about obsessing. And well, you get the point...</p>
 		<script>
 			import "../scripts/menu.js";
 		</script>
