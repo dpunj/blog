@@ -2,8 +2,7 @@
 import Navigation from "../components/Navigation.astro";
 import Footer from '../components/Footer.astro';
 import '../styles/global.css';
-
-const pageTitle = "favorite books"
+const pageTitle = "Music"
 ---
 
 <html lang="en">
@@ -17,11 +16,15 @@ const pageTitle = "favorite books"
 	<body>
 		<Navigation />
 		<h1>{pageTitle}</h1>
-		<p>Wanting</p>
-        <h1>reading</h1>
-        <p>Thinking in Systems</p>
-        <h1>read</h1>
-        <p>Project Hail Mary</p>
+		<p>Creators</p>
+            <ul>
+                <li>Four Tet</li>
+                <li>Fred Again</li>
+                <li>Nils Frahm</li>
+                <li>Ólafur Arnalds</li>
+                <li>Max Cooper</li>
+            </ul>
+        </p>
 		<Footer />
 	</body>
 </html>
