@@ -1,15 +1,29 @@
 ---
-import Social from './Social.astro';
+// import Social from './Social.astro';
 ---
 <style>
   footer {
     display: flex;
     gap: 1rem;
     margin-top: 2rem;
+    justify-content: center;
+    padding: 1rem 0;
+    border-top: 1px solid #ddd;
+  }
+  a {
+    color: #666;
+    text-decoration: none;
+  }
+  a:hover {
+    color: #000;
   }
 </style>
 
 <footer>
-  <Social platform="twitter" username="dpunjabi" />
-  <Social platform="github" username="dpunj" />
+  <a href="https://twitter.com/dpunjabi" target="_blank">x</a>
+  <a href="https://www.goodreads.com/user/show/31646136-divesh" target="_blank">goodreads</a>
+  <a href="https://github.com/dpunj" target="_blank">gh</a>
+  <a href="https://www.linkedin.com/in/diveshpunjabi/" target="_blank">linkedin</a>
+  <a href="https://www.are.na/divesh-punjabi/all" target="_blank">are.na</a>
+  
 </footer>

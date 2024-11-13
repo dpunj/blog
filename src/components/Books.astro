@@ -1,0 +1,59 @@
+---
+// src/components/Books.astro
+import type { Book, SortBy } from '../scripts/books';
+import { parseBooks, filterBooks, sortBooks } from '../scripts/books';
+
+export interface Props {
+  limit?: number;
+  sortBy?: SortBy;
+  shelf?: string;
+}
+
+const { limit, sortBy = 'date', shelf } = Astro.props;
+
+// Fetch and process books
+const allBooks = await parseBooks();
+const filteredBooks = filterBooks(allBooks, shelf);
+const sortedBooks = sortBooks(filteredBooks, sortBy);
+const books = limit ? sortedBooks.slice(0, limit) : sortedBooks;
+
+function formatDate(date: Date | null): string {
+  if (!date) return 'Not read';
+  return date.toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric'
+  });
+}
+---
+
+<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+  {books.map((book) => (
+    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden hover:shadow-xl transition-shadow duration-300">
+      <div class="p-6">
+        <h3 class="font-bold text-lg mb-2 text-gray-900 dark:text-white line-clamp-2">
+          {book.title}
+        </h3>
+        
+        <p class="text-sm text-gray-600 dark:text-gray-300 mb-3">
+          by {book.author}
+        </p>
+        
+        {book.rating > 0 && (
+          <div class="flex items-center mb-3">
+            {Array.from({ length: 5 }).map((_, i) => (
+              <span class={`text-lg ${i < book.rating ? "text-yellow-400" : "text-gray-300"}`}>
+                ★
+              </span>
+            ))}
+          </div>
+        )}
+        
+        <p class="text-xs text-gray-500 dark:text-gray-400">
+          {formatDate(book.dateRead)}
+        </p>
+      </div>
+    </div>
+  ))}
+</div>
+---

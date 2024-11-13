@@ -1,6 +1,7 @@
-# Divesh.dev *(tbd)*
+# divesh.gg
 
 My personal blog, built with Astro.
+- [ ] Register divesh.gg domain
 
 ## ⛴️ Project structure
 
