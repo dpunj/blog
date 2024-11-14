@@ -1,7 +1,52 @@
 ---
+const pathname = new URL(Astro.request.url).pathname;
+const currentPath = pathname.slice(1); // remove the leading slash
 ---
-<a href="/">Home</a>
-<a href="/wandering/">Wandering</a>
-<a href="/projects/">Writing</a>
-<a href="/books/">Books</a>  
-<a href="/about/">About</a>
+<nav class="flex items-center space-x-6">
+  {[
+    { path: '', label: 'Home' },
+    { path: 'waves', label: 'Waves' },
+    { path: 'depths', label: 'Depths' },
+    { path: 'books', label: 'Books' },
+    { path: 'music', label: 'Music' }
+  ].map(({ path, label }) => (
+    <a 
+      href={`/${path}`} 
+      class:list={[
+        "relative py-1.5 px-1",
+        "transition-colors duration-300",
+        "hover:text-blue-600 dark:hover:text-blue-300",
+        "text-blue-700 dark:text-blue-200",
+        // Active state
+        currentPath === path ? "active" : ""
+      ]}
+    >
+      {label}
+      {currentPath === path && (
+        <span class="absolute bottom-0 left-0 w-full h-0.5 bg-blue-600 dark:bg-blue-400 
+          transform origin-left animate-[width] duration-300"></span>
+      )}
+    </a>
+  ))}
+</nav>
+
+<style>
+  a::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 0;
+    height: 2px;
+    background: currentColor;
+    transition: width 0.3s ease;
+  }
+
+  a:hover::after {
+    width: 100%;
+  }
+
+  .active::after {
+    width: 100%;
+  }
+</style>
