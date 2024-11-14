@@ -1,0 +1,43 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+const pageTitle = "Depths";
+---
+
+<BaseLayout pageTitle={pageTitle}>
+  <div class="min-h-screen bg-gradient-to-b from-blue-50 to-blue-100 dark:from-blue-900 dark:to-blue-950 text-blue-900 dark:text-blue-100">
+    <main class="container mx-auto px-4 py-8 max-w-3xl">
+      <article class="prose prose-blue dark:prose-invert max-w-none">
+        <h1 class="text-4xl font-bold mb-4">My Deeper Explorations</h1>
+        <p>My deeper explorations</p>
+      </article>
+    </main>
+  </div>
+
+<style is:global>
+  .prose {
+    --tw-prose-body: theme('colors.blue.800');
+    --tw-prose-headings: theme('colors.blue.900');
+    --tw-prose-links: theme('colors.blue.600');
+    --tw-prose-bold: theme('colors.blue.900');
+    /* ... other prose styles ... */
+  }
+
+  .dark .prose {
+    --tw-prose-body: theme('colors.blue.200');
+    --tw-prose-headings: theme('colors.blue.100');
+    --tw-prose-links: theme('colors.blue.400');
+    /* ... other dark mode styles ... */
+  }
+
+  .prose a {
+    text-decoration: none;
+    transition: color 0.2s ease;
+  }
+
+  .prose a:hover {
+    color: theme('colors.blue.500');
+  }
+
+  /* Add other style rules as needed */
+</style>
+</BaseLayout>

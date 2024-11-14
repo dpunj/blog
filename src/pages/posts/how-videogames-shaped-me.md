@@ -41,6 +41,8 @@ I picked up vanilla WoW and chose a mighty Paladin as my first class. I didn't l
 
 I wasn't the one playing the game. I was supporting my brother in playing the game. It wasn't until Burning Crusade that I realized that I could be the one playing the game. And so I looked up for the most competitive PvE Realm (i.e., those that cleared new dungeons the fastest), created a Warlock there, and leveled it up to 70.
 
+Then the real game began - endgame. This involved grinding dungeons for hours praying to the RNG-gods to drop the gear to get you past the item level threshold for the next tier.
+
 **I learned I was the only thing holding me back.**
 
 Eventually, I needed a real life. Friends, a social life, dates. You know, the usual. But this just doesn't go well with trying to be #1 at WoW. And so I switched to League of Legends during its beta days.

@@ -2,11 +2,11 @@
 import BaseLayout from '../layouts/BaseLayout.astro';
 import BlogPost from '../components/BlogPost.astro';
 const allPosts = await Astro.glob('./posts/*.md');
-const pageTitle = "Wandering"
+const pageTitle = "Waves"
 ---
 
 <BaseLayout pageTitle={pageTitle}>
-	<p>My unordered stream of thoughts on life, technology, and the universe.</p>
+	<p>My fluid stream of thoughts on life, technology, and the universe</p>
 	<ul>
 		{allPosts.map((post) => <BlogPost url={post.url} title={post.frontmatter.title} />)}
 	</ul>
