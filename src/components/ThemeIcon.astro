@@ -1,4 +1,5 @@
 ---
+
 ---
 <button id="themeToggle" class="border-0 bg-transparent p-2 hover:bg-blue-100/20 rounded-md transition-colors">
   <svg width="24" height="24" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" class="transition-transform duration-300">
@@ -16,14 +17,28 @@
 </button>
 
 <style>
-  .sun { @apply fill-blue-900 transition-colors duration-300; }
-  .moon { @apply fill-transparent transition-colors duration-300; }
+  .sun { 
+    fill: rgb(30 58 138); /* blue-900 */
+    transition: color 300ms;
+  }
+  .moon { 
+    fill: transparent;
+    transition: color 300ms;
+  }
 
-  :global(.dark) .sun { @apply fill-transparent; }
-  :global(.dark) .moon { @apply fill-blue-100; }
+  :global(.dark) .sun { 
+    fill: transparent; 
+  }
+  :global(.dark) .moon { 
+    fill: rgb(219 234 254); /* blue-100 */ 
+  }
 
-  #themeToggle:hover .sun { @apply fill-blue-700; }
-  :global(.dark) #themeToggle:hover .moon { @apply fill-blue-300; }
+  #themeToggle:hover .sun { 
+    fill: rgb(29 78 216); /* blue-700 */
+  }
+  :global(.dark) #themeToggle:hover .moon { 
+    fill: rgb(147 197 253); /* blue-300 */
+  }
 </style>
 
 <script>

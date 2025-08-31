@@ -3,21 +3,78 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 import BooksComponent from '../components/Books.astro';
 
 const pageTitle = "Books";
-const pageDescription = "A collection of books I've read and am currently reading.";
----
+const pageDescription = "Noospheric indices";
 
+const favoriteBooks = [
+  {
+    title: "Wanting",
+    author: "Luke Burgis",
+    amazonLink: "https://www.amazon.com/Wanting-Power-Mimetic-Desire-Everyday/dp/1250262488/"
+  },
+  {
+    title: "Meditations (t. by Gregory Hays)",
+    author: "Marcus Aurelius",
+    amazonLink: "https://www.amazon.com/Meditations-Marcus-Aurelius/dp/0812968255/"
+  },
+  {
+    title: "Thinking in Systems",
+    author: "Donella H. Meadows",
+    amazonLink: "https://www.amazon.com/Thinking-Systems-Donella-H-Meadows/dp/1603580557/"
+  },
+  {
+    title: "The Evolving Self",
+    author: "Robert Kegan",
+    amazonLink: "https://www.amazon.com/Evolving-Self-Problem-Process-Development/dp/0674272315/"
+  },
+  {
+    title: "Range",
+    author: "David Epstein",
+    amazonLink: "https://www.amazon.com/Range-Generalists-Triumph-Specialized-World/dp/0735214484/"
+  },
+  {
+    title: "Gödel, Escher, Bach",
+    author: "Douglas Hofstadter",
+    amazonLink: "https://a.co/d/4khX6GJ"
+  },
+  {
+    title: "Siddhartha",
+    author: "Hermann Hesse",
+    amazonLink: "https://a.co/d/3P4MyJW"
+  },
+  {
+    title: "The Creative Act",
+    author: "Rick Rubin",
+    amazonLink: "https://a.co/d/3P4MyJW"
+  }
+];
+---
 <BaseLayout>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-    <header class="mb-12">
-      <h1 class="text-4xl font-bold text-gray-900 dark:text-white mb-4">
-        {pageTitle}
-      </h1>
-      <p class="text-xl text-gray-600 dark:text-gray-300">
-        {pageDescription}
-      </p>
-    </header>
+		<header class="mb-6">
+    <h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
+	<p class="text-l text-gray-600 dark:text-gray-300">{pageDescription}</p>
+</header>
 
     <section class="mb-16">
+      <ul class="space-y-2 max-w-2xl">
+        {favoriteBooks.map((book) => (
+          <li>
+            <div class="flex items-baseline gap-x-3">
+              <div>
+                <a href={book.amazonLink} target="_blank" rel="noopener noreferrer">
+                  {book.title}
+                </a>
+                <span class="text-sm text-gray-500 dark:text-gray-400 font-light">
+                  by {book.author}
+                </span>
+              </div>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+    
+    <!-- For later use - Goodreads integration -->
+    <!-- <section class="mb-16">
       <h2 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">
         Currently Reading
       </h2>
@@ -37,5 +94,5 @@ const pageDescription = "A collection of books I've read and am currently readin
       </h2>
       <BooksComponent limit={4} sortBy="rating" />
     </section>
-  </div>
+  </div> -->
 </BaseLayout>

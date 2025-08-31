@@ -1,12 +1,11 @@
 ---
-layout: ../../layouts/MarkdownPostLayout.astro
 title: How videogames shaped me 🎮 (wip)
 author: divesh punjabi
 description: "An exploration of how videogames and computers have guided my life."
 image:
     url: "https://docs.astro.build/default-og-image.png"
     alt: "The word astro against an illustration of planets and stars."
-pubDate: 2022-08-08
+pubDate: "2022-08-08"
 tags: ["gaming", "computers", "programming"]
 ---
 I was born as Divesh Punjabi in Panama. As the son of Indian-Colombian immigrants, I had a hard time choosing my identity - it was hard to relate with my Indian friends from the diaspora in Panama, but also to my Panamanian friends from the Catholic school I attended. And of course, religion didn't help much.

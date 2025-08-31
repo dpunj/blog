@@ -1,13 +1,16 @@
 ---
 import BaseLayout from '../layouts/BaseLayout.astro';
 import BlogPost from '../components/BlogPost.astro';
-const allPosts = await Astro.glob('./posts/*.md');
+import { getCollection } from 'astro:content';
+
+const allPosts = await getCollection('waves');
 const pageTitle = "Waves"
 ---
 
-<BaseLayout pageTitle={pageTitle}>
-	<p>My fluid stream of thoughts on life, technology, and the universe</p>
+<BaseLayout>
+	<h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
+	<p class="mb-8">Fluid stream of consciousness on life, technology, and the universe</p>
 	<ul>
-		{allPosts.map((post) => <BlogPost url={post.url} title={post.frontmatter.title} />)}
+		{allPosts.map((post) => <BlogPost url={`/waves/${post.id}`} title={post.data.title} date={post.data.pubDate}/>)}
 	</ul>
 </BaseLayout>

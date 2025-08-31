@@ -1,15 +1,38 @@
 ---
 import BaseLayout from "../layouts/BaseLayout.astro";
-const pageTitle = "Music"
+const pageTitle = "Music";
+const pageDescription = "Energy vessels";
+const musicians = [
+    { name: "Four Tet", url: "https://en.wikipedia.org/wiki/Four_Tet" },
+    { name: "Fred Again", url: "https://en.wikipedia.org/wiki/Fred_Again" },
+    { name: "Nils Frahm", url: "https://en.wikipedia.org/wiki/Nils_Frahm" },
+    { name: "Ólafur Arnalds", url: "https://en.wikipedia.org/wiki/%C3%93lafur_Arnalds" },
+    { name: "Max Cooper", url: "https://en.wikipedia.org/wiki/Max_Cooper_(musician)" },
+    { name: "Nicolas Jaar", url: "https://en.wikipedia.org/wiki/Nicolas_Jaar" },
+    { name: "Bon Iver", url: "https://en.wikipedia.org/wiki/Bon_Iver" },
+    { name: "Miles Davis", url: "https://en.wikipedia.org/wiki/Miles_Davis" },
+    { name: "Señor Loop", url: "https://en.wikipedia.org/wiki/Se%C3%B1or_Loop" },
+    { name: "Kendrick Lamar", url: "https://en.wikipedia.org/wiki/Kendrick_Lamar" }
+];
 ---
 
-<BaseLayout pageTitle={pageTitle}>
-	<h1 class="text-4xl font-bold mb-4">Creators</h1>
-	<ul>
-		<li>Four Tet</li>
-		<li>Fred Again</li>
-		<li>Nils Frahm</li>
-		<li>Ólafur Arnalds</li>
-		<li>Max Cooper</li>
+<BaseLayout>
+	<div class="max-w-4xl mx-auto px-4 py-8">
+		<header class="mb-6">
+		<h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
+	<p class="text-l text-gray-600 dark:text-gray-300">{pageDescription}</p>
+</header>
+
+<section>
+	<ul class="space-y-1">
+		{musicians.map((musician) => (
+			<li>
+				<a href={musician.url} class="text-s" target="_blank">
+					{musician.name}
+				</a>
+			</li>
+		))}
 	</ul>
+		</section>
+	</div>
 </BaseLayout>
