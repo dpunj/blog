@@ -1,40 +1,40 @@
-@import 'tailwindcss';
+@import "tailwindcss";
 
 @custom-variant dark (&:is(.dark *));
 
 @theme {
-  --animate-fade-in: fade-in 0.5s ease-in-out;
-  --animate-slide-in: slide-in 0.5s ease-in-out;
+	--animate-fade-in: fade-in 0.5s ease-in-out;
+	--animate-slide-in: slide-in 0.5s ease-in-out;
 
-  @keyframes fade-in {
-    0% {
-      opacity: 0;
-    }
-    100% {
-      opacity: 1;
-    }
-  }
-  @keyframes slide-in {
-    0% {
-      transform: translateY(20px);
-      opacity: 0;
-    }
-    100% {
-      transform: translateY(0);
-      opacity: 1;
-    }
-  }
+	@keyframes fade-in {
+		0% {
+			opacity: 0;
+		}
+		100% {
+			opacity: 1;
+		}
+	}
+	@keyframes slide-in {
+		0% {
+			transform: translateY(20px);
+			opacity: 0;
+		}
+		100% {
+			transform: translateY(0);
+			opacity: 1;
+		}
+	}
 }
 
 @utility container {
-  margin-inline: auto;
-  padding-inline: 2rem;
-  @media (width >= --theme(--breakpoint-sm)) {
-    max-width: none;
-  }
-  @media (width >= 1400px) {
-    max-width: 1400px;
-  }
+	margin-inline: auto;
+	padding-inline: 2rem;
+	@media (width >= --theme(--breakpoint-sm)) {
+		max-width: none;
+	}
+	@media (width >= 1400px) {
+		max-width: 1400px;
+	}
 }
 
 /*
@@ -46,35 +46,35 @@
   color utility to any element that depends on these defaults.
 */
 @layer base {
-  *,
-  ::after,
-  ::before,
-  ::backdrop,
-  ::file-selector-button {
-    border-color: var(--color-gray-200, currentColor);
-  }
+	*,
+	::after,
+	::before,
+	::backdrop,
+	::file-selector-button {
+		border-color: var(--color-gray-200, currentColor);
+	}
 }
 
 :root {
-  --background: 210 40% 98%;
-  --foreground: 222.2 84% 4.9%;
-  --muted: 215 20.2% 65.1%;
-  --muted-foreground: 217.2 32.6% 17.5%;
+	--background: 210 40% 98%;
+	--foreground: 222.2 84% 4.9%;
+	--muted: 215 20.2% 65.1%;
+	--muted-foreground: 217.2 32.6% 17.5%;
 }
 
 .dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
+	--background: 222.2 84% 4.9%;
+	--foreground: 210 40% 98%;
+	--muted: 217.2 32.6% 17.5%;
+	--muted-foreground: 215 20.2% 65.1%;
 }
 
 body {
-  @apply bg-linear-to-b from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-950;
-  @apply text-blue-900 dark:text-blue-100;
-  @apply min-h-screen transition-colors duration-300;
+	@apply bg-linear-to-b from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-950;
+	@apply text-blue-900 dark:text-blue-100;
+	@apply min-h-screen transition-colors duration-300;
 }
 
 ::selection {
-  background: rgba(56, 189, 248, 0.2);
+	background: rgba(56, 189, 248, 0.2);
 }

@@ -1,7 +1,7 @@
 ---
-import BaseLayout from "../layouts/BaseLayout.astro";
-import BlogPost from '../components/BlogPost.astro';
 import { getCollection } from 'astro:content';
+import BlogPost from '../components/BlogPost.astro';
+import BaseLayout from "../layouts/BaseLayout.astro";
 
 const pageTitle = "Depths";
 const pageDescription = "Shall we dive?";
@@ -15,10 +15,10 @@ const sortedPosts = posts.sort((a, b) => new Date(b.data.pubDate).getTime() - ne
         <p class="text-l text-sky-400 dark:text-sky-300">{pageDescription}</p>
     </header>
         <ul>
-            {sortedPosts.map((post) => 
+            {sortedPosts.map((post) =>
             <BlogPost
               url={`/depths/${post.id}`}
-              title={post.data.title}f
+              title={post.data.title}
               date={new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', year: '2-digit'})}
             />)}
         </ul>

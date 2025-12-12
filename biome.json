@@ -5,7 +5,8 @@
 		"useIgnoreFile": true
 	},
 	"files": {
-		"ignoreUnknown": false
+		"ignoreUnknown": false,
+		"includes": ["**", "!.astro", "!.vscode", "!!dist"]
 	},
 	"formatter": {
 		"enabled": true,
@@ -30,7 +31,7 @@
 	},
 	"overrides": [
 		{
-			"includes": ["*.astro"],
+			"includes": ["**/*.astro"],
 			"linter": {
 				"enabled": false
 			},
