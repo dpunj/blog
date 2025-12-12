@@ -19,9 +19,13 @@ This project uses [Biome](https://biomejs.dev/) for linting and formatting.
 
 | Command | Action |
 | :-- | :-- |
+| `bun check` | Type check (Astro/TypeScript) |
+| `bun check:all` | Type check + lint + format check |
 | `bun lint` | Check for linting issues |
 | `bun lint:fix` | Fix linting issues |
 | `bun format` | Format all files |
+
+Run Biome directly on specific files with `bunx biome check <file>`.
 
 ## Project Structure
 
