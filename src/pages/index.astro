@@ -17,9 +17,9 @@ const latestDepths = depthPosts
   .sort((a, b) => new Date(b.data.pubDate).getTime() - new Date(a.data.pubDate).getTime())
   .slice(0, 3);
 ---
-<BaseLayout>
+<BaseLayout pageTitle={pageTitle}>
 	<h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
-		
+
 	<p class="mb-6">Hey, I'm Divesh. Born in Panama to Indian-Colombian parents, now living in San Francisco after studying in Boston.</p>
 
 	<p class="mb-6">I think about systems, decentralization, incentives, and games. Building <a href="https://versa.so" class="text-sky-400 hover:text-sky-300">Versa</a> to enable peer-to-peer commerce with AI agents that automate sales and increase discovery in Latin America.</p>
@@ -31,14 +31,14 @@ const latestDepths = depthPosts
 		<li><a href="https://mirror.xyz/steeldao.eth/bg3vMQYjPFddZkKtWaGe8zYg4w6H3VCRq7l3oqVSyd8" class="text-sky-400 hover:text-sky-300">Blockchain: A Catalyst for Open-Source AI</a></li>
 		<li><a href="https://www.bvp.com/news/building-the-web3-ecosystem-of-the-future" class="text-sky-400 hover:text-sky-300">Launching Steel DAO</a></li>
 		<li><a href="https://www.bvp.com/atlas/are-zero-knowledge-proofs-zkps-the-future-of-blockchain" class="text-sky-400 hover:text-sky-300">Are ZKPs the Future of Blockchain?</a></li>
-	</ul>	
+	</ul>
 
 	<div class="grid grid-cols-1 md:grid-cols-2 gap-8 my-12">
 		<section>
 			<h2 class="text-2xl font-bold mb-4">Waves</h2>
 			<ul class="space-y-4">
 				{latestWaves.map((post) => (
-					<BlogPost 
+					<BlogPost
 						url={`/waves/${post.id}`}
 						title={post.data.title}
 						date={new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', year: '2-digit'})}
@@ -52,7 +52,7 @@ const latestDepths = depthPosts
 			<h2 class="text-2xl font-bold mb-4">Depths</h2>
 			<ul class="space-y-4">
 				{latestDepths.map((post) => (
-					<BlogPost 
+					<BlogPost
 						url={`/depths/${post.id}`}
 						title={post.data.title}
 						date={new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', year: 'numeric'})}

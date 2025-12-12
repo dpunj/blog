@@ -2,7 +2,7 @@
 import Footer from '../components/Footer.astro';
 import Header from '../components/Header.astro';
 import '../styles/global.css';
-const { pageTitle } = Astro.props;
+const { pageTitle = "Welcome to my mind... 🌊" } = Astro.props;
 ---
 <html lang="en">
   <head>
@@ -14,7 +14,6 @@ const { pageTitle } = Astro.props;
   </head>
   <body class ="max-w-3xl mx-auto px-8">
     <Header />
-    <h1>{pageTitle}</h1>
     <main class="my-8">
       <slot />
     </main>

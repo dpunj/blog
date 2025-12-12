@@ -47,7 +47,7 @@ const favoriteBooks = [
   }
 ];
 ---
-<BaseLayout>
+<BaseLayout pageTitle={pageTitle}>
 		<header class="mb-6">
     <h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
 	<p class="text-l text-gray-600 dark:text-gray-300">{pageDescription}</p>
@@ -71,7 +71,7 @@ const favoriteBooks = [
         ))}
       </ul>
     </section>
-    
+
     <!-- For later use - Goodreads integration -->
     <!-- <section class="mb-16">
       <h2 class="text-2xl font-bold mb-6 text-gray-900 dark:text-white">

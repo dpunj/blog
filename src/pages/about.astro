@@ -3,12 +3,12 @@ import BaseLayout from '../layouts/BaseLayout.astro';
 
 const pageTitle = "About";
 ---
-<BaseLayout>
+<BaseLayout pageTitle={pageTitle}>
 	<h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
 	<p class="mb-6">Hey, I'm Divesh. Born in Panama to Indian and Colombian parents, now living in San Francisco after studying in Boston.</p>
 
-	<p class="mb-6">Raised at the crossroads of commerce in Central America, first went Northeast to study at MIT, then West to the frontier of technology in Silicon Valley.</p> 
-		
+	<p class="mb-6">Raised at the crossroads of commerce in Central America, first went Northeast to study at MIT, then West to the frontier of technology in Silicon Valley.</p>
+
 	<p class="mb-6">Now building <a href="https://versa.so" class="text-sky-400 hover:text-sky-300">Versa</a> to enable peer-to-peer commerce with AI agents, starting by automating food delivery sales in Latin America.</p>
 
 	<p class="mb-4">Before, I was:</p>
