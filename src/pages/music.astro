@@ -28,33 +28,29 @@ const playlistName = data.playlist.name;
 ---
 
 <BaseLayout pageTitle={pageTitle}>
-	<div class="max-w-4xl mx-auto px-4 py-8">
-		<header class="mb-8">
-			<h1 class="text-4xl font-bold mb-2">{pageTitle}</h1>
-			<p class="text-lg text-gray-600 dark:text-gray-300">{pageDescription}</p>
-		</header>
+	<h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
+	<p class="mb-8">{pageDescription}</p>
 
-		<section class="mb-10">
-			<h2 class="text-xl font-semibold mb-3 text-gray-700 dark:text-gray-300">Energy Vessels</h2>
-			<div class="flex flex-wrap gap-2">
-				{curated.map((artist) => (
-					<a
-						href={artist.url}
-						target="_blank"
-						rel="noopener noreferrer"
-						class="px-3 py-1 text-sm rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-					>
-						{artist.name}
-					</a>
-				))}
-			</div>
-		</section>
+	<section class="mb-10">
+		<h2 class="text-xl font-semibold mb-3 text-gray-700 dark:text-gray-300">Energy Vessels</h2>
+		<div class="flex flex-wrap gap-2">
+			{curated.map((artist) => (
+				<a
+					href={artist.url}
+					target="_blank"
+					rel="noopener noreferrer"
+					class="px-3 py-1 text-sm rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+				>
+					{artist.name}
+				</a>
+			))}
+		</div>
+	</section>
 
-		<section>
-			<h2 class="text-xl font-semibold mb-4 text-gray-700 dark:text-gray-300">
-				Playlist: <span class="italic font-normal">{playlistName}</span>
-			</h2>
-			<MusicExplorer tracks={tracks} playlistName={playlistName} client:load />
-		</section>
-	</div>
+	<section>
+		<h2 class="text-xl font-semibold mb-4 text-gray-700 dark:text-gray-300">
+			Playlist: <span class="italic font-normal">{playlistName}</span>
+		</h2>
+		<MusicExplorer tracks={tracks} playlistName={playlistName} client:load />
+	</section>
 </BaseLayout>
