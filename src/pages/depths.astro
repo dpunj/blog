@@ -12,7 +12,7 @@ const sortedPosts = posts.sort((a, b) => new Date(b.data.pubDate).getTime() - ne
 <BaseLayout pageTitle={pageTitle}>
     <header class="mb-6">
         <h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
-        <p class="text-l text-sky-400 dark:text-sky-300">{pageDescription}</p>
+        <p class="mb-8">{pageDescription}</p>
     </header>
         <ul>
             {sortedPosts.map((post) =>
