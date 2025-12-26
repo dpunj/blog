@@ -22,5 +22,4 @@ const sortedPosts = posts.sort((a, b) => new Date(b.data.pubDate).getTime() - ne
               date={new Date(post.data.pubDate).toLocaleDateString('en-US', { month: 'short', year: '2-digit'})}
             />)}
         </ul>
-    </main>
 </BaseLayout>
