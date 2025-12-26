@@ -39,7 +39,17 @@ src/
 ├── pages/           # Routes
 ├── scripts/         # Client-side JS
 └── styles/          # Global CSS
+public/
+└── data/            # Data files (Goodreads export, etc.)
 ```
+
+## Features
+
+### Books (`/books`)
+Interactive library explorer powered by Goodreads CSV export. Filter by shelf, decade, or recommender. Sort by various fields. Export selections as JSON or text.
+
+### Music (`/music`)
+Music explorer for Spotify listening data.
 
 ## Content
 
