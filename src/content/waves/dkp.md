@@ -1,6 +1,5 @@
 ---
 title: "DKP as the OG digital currency"
-author: "Divesh Punjabi"
 pubDate: "2024-12-23"
 tags: ["contributions", "communities"]
 ---

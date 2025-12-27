@@ -1,6 +1,5 @@
 ---
 title: Thoughts on The Immortality Key
-author: Divesh Punjabi
 description: How voluntarily suffering removes the fear of suffering itself
 pubDate: "2025-03-16"
 tags: ["books", "review"]

@@ -1,6 +1,5 @@
 ---
 title: "25 Albums to listen to in 2025"
-author: "Divesh Punjabi"
 pubDate: "2025-03-30"
 tags: ["intro", "blog", "music"]
 ---

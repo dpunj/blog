@@ -1,6 +1,5 @@
 ---
 title: How videogames shaped me 🎮 (wip)
-author: divesh punjabi
 description: "An exploration of how videogames and computers have guided my life."
 image:
     url: "https://docs.astro.build/default-og-image.png"

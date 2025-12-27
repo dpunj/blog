@@ -1,6 +1,5 @@
 ---
 title: A Cybernetic Symbiosis 🎮
-author: divesh punjabi
 description: "An exploration of how videogames and computers shaped my life."
 image: "https://docs.astro.build/default-og-image.png"
 pubDate: "2024-11-22"

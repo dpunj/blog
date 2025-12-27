@@ -1,6 +1,5 @@
 ---
 title: "Threads"
-author: "Divesh Punjabi"
 pubDate: "2024-12-23"
 tags: ["intro", "blog"]
 ---

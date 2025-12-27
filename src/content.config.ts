@@ -5,7 +5,6 @@ import { glob } from "astro/loaders";
 // define general schema with zod validation
 const blogSchema = z.object({
 	title: z.string(),
-	author: z.string(),
 	image: z.string().optional(),
 	pubDate: z.coerce.date(),
 	tags: z.array(z.string()),
