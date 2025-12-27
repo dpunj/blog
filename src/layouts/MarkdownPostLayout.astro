@@ -2,16 +2,18 @@
 import BaseLayout from './BaseLayout.astro';
 
 const { frontmatter } = Astro.props;
+
+const formatDate = (date: Date) =>
+  date.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
 ---
 <BaseLayout pageTitle={frontmatter.title}>
   <article class="prose prose-blue dark:prose-invert max-w-none">
     <h1>{frontmatter.title}</h1>
     <div class="metadata">
       <p><em>{frontmatter.description}</em></p>
-      <time datetime={frontmatter.pubDate}>
-        {frontmatter.pubDate.toString().slice(0,10)}
+      <time datetime={new Date(frontmatter.pubDate).toISOString()}>
+        {formatDate(new Date(frontmatter.pubDate))}
       </time>
-      <span class="author">by {frontmatter.author}</span>
     </div>
 
     <div class="tags">
