@@ -4,6 +4,7 @@ import BlogPost from '../components/BlogPost.astro';
 import BaseLayout from '../layouts/BaseLayout.astro';
 
 const allPosts = await getCollection('waves');
+const sortedPosts = allPosts.sort((a, b) => new Date(b.data.pubDate).getTime() - new Date(a.data.pubDate).getTime());
 const pageTitle = "Waves";
 const pageDescription = "Fluid stream of consciousness on life, technology, and the universe";
 ---
@@ -12,6 +13,6 @@ const pageDescription = "Fluid stream of consciousness on life, technology, and 
 	<h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
 	<p class="mb-8">{pageDescription}</p>
 	<ul>
-		{allPosts.map((post) => <BlogPost url={`/waves/${post.id}`} title={post.data.title} date={post.data.pubDate}/>)}
+		{sortedPosts.map((post) => <BlogPost url={`/waves/${post.id}`} title={post.data.title} date={post.data.pubDate}/>)}
 	</ul>
 </BaseLayout>
