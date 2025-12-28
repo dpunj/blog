@@ -25,3 +25,6 @@ pnpm-debug.log*
 
 logs/
 __pycache__/
+
+# SQLite knowledge base (generated)
+data/

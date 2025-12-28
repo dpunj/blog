@@ -12,7 +12,11 @@
 		"check:all": "astro check && biome check .",
 		"lint": "biome check .",
 		"lint:fix": "biome check --write .",
-		"format": "biome format --write ."
+		"format": "biome format --write .",
+		"db": "bun scripts/db.ts",
+		"sync": "bun scripts/sync.ts",
+		"sync:books": "bun scripts/sync.ts books",
+		"sync:music": "bun scripts/sync.ts music"
 	},
 	"dependencies": {
 		"@astrojs/check": "^0.9.6",

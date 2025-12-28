@@ -127,6 +127,41 @@ image?: string         # Optional image URL
 - Check build with `bun build` to catch type errors
 - Preview builds locally with `bun preview`
 
+## Knowledge Base (SQLite)
+
+A local SQLite database (`data/knowledge.db`) stores books, music, and other resources for querying at build time.
+
+### Scripts
+
+Located in `scripts/` (run with Bun, not Astro):
+
+- **`scripts/db.ts`** — SQLite schema and CRUD helpers using `bun:sqlite`
+- **`scripts/sync.ts`** — CLI for syncing data into the database
+
+### Sync Commands
+
+```bash
+bun sync              # Sync all local data sources
+bun sync books        # Sync Goodreads books only
+bun sync music        # Sync Spotify tracks only
+bun sync --stats      # Show database stats
+bun sync --export all # Export all resources as JSON
+```
+
+### Data Sources
+
+Currently syncs from **local files** (not APIs):
+
+| Source | File | Type |
+|--------|------|------|
+| Goodreads | `public/data/goodreads_library_export.csv` | books |
+| Spotify | `public/data/wtm.json` | tracks |
+
+### Future: API Integrations (not yet implemented)
+
+- **Readwise** — Requires `READWISE_TOKEN` env var
+- **Zotero** — Requires `ZOTERO_API_KEY` env var
+
 ## Don't
 
 - Don't add `tailwind.config.js` (uses Tailwind v4 CSS-based config)
