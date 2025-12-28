@@ -40,7 +40,6 @@ const formatDate = (date: Date) =>
     font-weight: 700;
     line-height: 1.2;
     margin-bottom: 1rem;
-    color: var(--color-heading);
   }
 
   /* Metadata section */
@@ -134,21 +133,19 @@ const formatDate = (date: Date) =>
   }
 
   /* Dark mode */
-  @media (prefers-color-scheme: dark) {
-    :root {
-      --color-heading: #f7fafc;
-      --color-text: #e2e8f0;
-      --color-text-muted: #a0aec0;
-      --color-border: #2d3748;
-      --color-link: #63b3ed;
-      --color-link-hover: #90cdf4;
-      --color-link-underline: #2c5282;
-      --color-tag-bg: #2a4365;
-      --color-tag-bg-hover: #2c5282;
-      --color-tag-text: #ebf8ff;
-      --color-code-bg: #2d3748;
-      --color-blockquote-border: #4a5568;
-      --color-blockquote-text: #cbd5e0;
-    }
+  :root:has(.dark) {
+    --color-heading: #f7fafc;
+    --color-text: #e2e8f0;
+    --color-text-muted: #a0aec0;
+    --color-border: #2d3748;
+    --color-link: #63b3ed;
+    --color-link-hover: #90cdf4;
+    --color-link-underline: #2c5282;
+    --color-tag-bg: #2a4365;
+    --color-tag-bg-hover: #2c5282;
+    --color-tag-text: #ebf8ff;
+    --color-code-bg: #2d3748;
+    --color-blockquote-border: #4a5568;
+    --color-blockquote-text: #cbd5e0;
   }
 </style>
