@@ -11,6 +11,11 @@ const { pageTitle = "Welcome to my mind... 🌊" } = Astro.props;
     <meta name="viewport" content="width=device-width" />
     <meta name="generator" content={Astro.generator} />
     <title>{pageTitle}</title>
+    <script is:inline>
+      const theme = localStorage.getItem('theme') ?? 
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      if (theme === 'dark') document.documentElement.classList.add('dark');
+    </script>
   </head>
   <body class ="max-w-3xl mx-auto px-8">
     <Header />
