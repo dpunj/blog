@@ -15,8 +15,9 @@
 		"format": "biome format --write .",
 		"db": "bun scripts/db.ts",
 		"sync": "bun scripts/sync.ts",
-		"sync:books": "bun scripts/sync.ts books",
-		"sync:music": "bun scripts/sync.ts music"
+		"sync:local": "bun scripts/sync.ts local",
+		"sync:api": "bun scripts/sync.ts api",
+		"sync:export": "bun scripts/sync.ts --export-library"
 	},
 	"dependencies": {
 		"@astrojs/check": "^0.9.6",
@@ -29,6 +30,7 @@
 		"typescript": "^5.9.3"
 	},
 	"devDependencies": {
-		"@biomejs/biome": "^2.3.8"
+		"@biomejs/biome": "^2.3.8",
+		"@types/node": "^25.0.2"
 	}
 }

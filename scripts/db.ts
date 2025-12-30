@@ -68,20 +68,46 @@ export function getDb(): Database {
 }
 
 // Resource types
+export type ResourceType =
+	| "bookmark"
+	| "article"
+	| "video"
+	| "paper"
+	| "book"
+	| "track"
+	| "pdf"
+	| "epub"
+	| "tweet"
+	| "other";
+
+export type ResourceSource =
+	| "readwise"
+	| "zotero"
+	| "goodreads"
+	| "spotify"
+	| "manual";
+
 export interface Resource {
 	id: string;
-	type: "bookmark" | "video" | "paper" | "book" | "track";
+	type: ResourceType;
 	title: string;
 	url?: string;
 	author?: string;
 	description?: string;
 	tags?: string[];
-	source: string;
+	source: ResourceSource;
 	source_id?: string;
 	metadata?: Record<string, unknown>;
 	created_at?: string;
 	updated_at?: string;
 	classified_at?: string;
+	// Readwise-specific
+	image_url?: string;
+	reading_progress?: number;
+	date_published?: string;
+	// Zotero-specific
+	item_type?: string;
+	publication_title?: string;
 }
 
 // Insert or update a resource
@@ -132,6 +158,32 @@ export function getResourcesByType(db: Database, type: Resource["type"]): Resour
 export function getAllResources(db: Database): Resource[] {
 	const stmt = db.prepare("SELECT * FROM resources ORDER BY created_at DESC");
 	const rows = stmt.all() as Record<string, unknown>[];
+
+	return rows.map((row) => ({
+		...row,
+		tags: row.tags ? JSON.parse(row.tags as string) : undefined,
+		metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined,
+	})) as Resource[];
+}
+
+// Get library resources (readwise + zotero)
+export function getLibraryResources(db: Database): Resource[] {
+	const stmt = db.prepare(
+		"SELECT * FROM resources WHERE source IN ('readwise', 'zotero') ORDER BY created_at DESC"
+	);
+	const rows = stmt.all() as Record<string, unknown>[];
+
+	return rows.map((row) => ({
+		...row,
+		tags: row.tags ? JSON.parse(row.tags as string) : undefined,
+		metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined,
+	})) as Resource[];
+}
+
+// Get resources by source
+export function getResourcesBySource(db: Database, source: ResourceSource): Resource[] {
+	const stmt = db.prepare("SELECT * FROM resources WHERE source = ? ORDER BY created_at DESC");
+	const rows = stmt.all(source) as Record<string, unknown>[];
 
 	return rows.map((row) => ({
 		...row,
