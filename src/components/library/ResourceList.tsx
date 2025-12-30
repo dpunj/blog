@@ -1,5 +1,5 @@
 import { useMemo, useState } from "preact/hooks";
-import type { Resource } from "../../scripts/library";
+import type { Resource } from "../../lib/library";
 import ResourceCard from "./ResourceCard";
 
 interface Props {

@@ -1,5 +1,5 @@
 import { useState } from "preact/hooks";
-import type { TagHierarchy } from "../../scripts/library";
+import type { TagHierarchy } from "../../lib/library";
 import TagNode from "./TagNode";
 
 interface Props {

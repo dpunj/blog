@@ -6,7 +6,7 @@ import type {
 	SortBy,
 	SortOrder,
 	TagHierarchy,
-} from "../../scripts/library";
+} from "../../lib/library";
 import {
 	computeLibraryStats,
 	filterBySource,
@@ -15,7 +15,7 @@ import {
 	getResourceTypes,
 	searchResources,
 	sortResources,
-} from "../../scripts/library";
+} from "../../lib/library";
 import LibrarySearch from "./LibrarySearch";
 import LibraryStats from "./LibraryStats";
 import ResourceList from "./ResourceList";

@@ -5,7 +5,7 @@ import type {
 	SortBy,
 	SortOrder,
 	Stats,
-} from "../scripts/books";
+} from "../lib/books";
 import {
 	computeStats,
 	exportAsJson,
@@ -17,7 +17,7 @@ import {
 	getRecommenders,
 	searchBooks,
 	sortBooks,
-} from "../scripts/books";
+} from "../lib/books";
 
 interface Props {
 	books: BookDisplay[];

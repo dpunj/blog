@@ -1,4 +1,4 @@
-import type { TagNode as TagNodeType } from "../../scripts/library";
+import type { TagNode as TagNodeType } from "../../lib/library";
 
 interface Props {
 	node: TagNodeType;

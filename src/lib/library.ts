@@ -38,7 +38,7 @@ export interface LibraryData {
 	resources: Resource[];
 }
 
-// DB Resource type (from scripts/db.ts - snake_case fields)
+// DB Resource type (from db.ts - snake_case fields)
 export interface DbResource {
 	id: string;
 	type: string;

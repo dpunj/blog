@@ -1,5 +1,5 @@
-import type { Resource } from "../../scripts/library";
-import { formatDate } from "../../scripts/library";
+import type { Resource } from "../../lib/library";
+import { formatDate } from "../../lib/library";
 
 interface Props {
 	resource: Resource;

@@ -1,5 +1,5 @@
 import { useCallback, useMemo, useState } from "preact/hooks";
-import type { SortBy, SortOrder, Stats, TrackDisplay } from "../scripts/music";
+import type { SortBy, SortOrder, Stats, TrackDisplay } from "../lib/music";
 import {
 	computeStats,
 	exportAsJson,
@@ -10,7 +10,7 @@ import {
 	getDecades,
 	searchTracks,
 	sortTracks,
-} from "../scripts/music";
+} from "../lib/music";
 
 interface Props {
 	tracks: TrackDisplay[];

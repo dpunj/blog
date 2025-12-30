@@ -1,5 +1,5 @@
-import type { LibraryStats as Stats } from "../../scripts/library";
-import { formatDateTime } from "../../scripts/library";
+import type { LibraryStats as Stats } from "../../lib/library";
+import { formatDateTime } from "../../lib/library";
 
 interface Props {
 	stats: Stats;

@@ -2,8 +2,8 @@
 import LibraryExplorer from "../components/library/LibraryExplorer";
 import tagHierarchyConfig from "../data/tag-hierarchy.json";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import type { LibraryData, TagHierarchyConfig } from "../scripts/library";
-import { buildTagHierarchy } from "../scripts/library";
+import type { LibraryData, TagHierarchyConfig } from "../lib/library";
+import { buildTagHierarchy } from "../lib/library";
 
 const pageTitle = "Library";
 const pageDescription = "My digital garden of bookmarks, articles, and papers";
