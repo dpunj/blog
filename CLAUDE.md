@@ -19,15 +19,26 @@ Personal blog for divesh.gg built with Astro, Preact, and Tailwind CSS v4. This 
 
 ```
 src/
-├── components/      # UI components (.astro, .jsx, .tsx)
+├── components/
+│   ├── library/     # Library explorer components (Preact)
+│   └── ...          # Other UI components (.astro, .jsx, .tsx)
 ├── content/
 │   ├── waves/       # Short-form posts (markdown)
 │   └── depths/      # Long-form posts (markdown)
 ├── content.config.ts # Content collections schema
+├── data/
+│   └── tag-hierarchy.json  # Library tag organization
 ├── layouts/         # Page layout templates
 ├── pages/           # File-based routing
-├── scripts/         # Client-side JavaScript
+├── scripts/         # Utility functions (library.ts, music.ts, etc.)
 └── styles/          # Global CSS
+scripts/
+├── db.ts            # SQLite schema and CRUD helpers (bun:sqlite)
+└── sync.ts          # Unified CLI for syncing all data sources
+data/
+└── knowledge.db     # SQLite database (source of truth)
+public/data/
+└── library.json     # Exported from SQLite for Astro build
 ```
 
 ## Development Workflow
@@ -39,6 +50,9 @@ src/
 - `bun lint` - Check for issues
 - `bun lint:fix` - Auto-fix linting issues
 - `bun format` - Format all files
+- `bun sync local` - Sync local sources (books, music) - fast
+- `bun sync api` - Sync API sources (Readwise, Zotero) - slow, rate limited
+- `bun sync --export-library` - Export library from SQLite to JSON for Astro
 
 ### Package Manager
 - **Prefer Bun** for all package operations
@@ -94,6 +108,35 @@ image?: string         # Optional image URL
 - Lighter alternative to React
 - Use `client:*` directives in Astro for hydration
 
+### Library (Digital Garden)
+A browsable archive of bookmarks (Readwise) and papers (Zotero) with hierarchical tag navigation.
+
+**Data Flow:**
+```
+Readwise/Zotero APIs → sync.ts → SQLite → --export-library → library.json → /library page
+```
+
+**Key Files:**
+- `scripts/sync.ts` - Unified sync CLI with API fetchers and rate limiting
+- `scripts/db.ts` - SQLite schema and CRUD helpers
+- `src/scripts/library.ts` - Types, tag hierarchy builder, filters, sorting
+- `src/data/tag-hierarchy.json` - Manual tag → hierarchy mapping (edit this!)
+- `src/components/library/` - Preact components (LibraryExplorer, TagTree, ResourceList, etc.)
+- `public/data/library.json` - Exported for Astro (regenerate with `bun sync --export-library`)
+
+**Environment Variables** (`.env`):
+```
+READWISE_TOKEN=xxx
+ZOTERO_API_KEY=xxx
+ZOTERO_USER_ID=xxx
+```
+
+**Updating the Library:**
+1. Run `bun sync api` to fetch latest from Readwise + Zotero (slow, rate limited)
+2. Run `bun sync --export-library` to regenerate JSON for Astro
+3. Edit `src/data/tag-hierarchy.json` to organize new tags
+4. Uncategorized tags appear at the bottom of the tag tree
+
 ## Important Notes
 
 - **SEO Component**: Uses TypeScript (.tsx) - maintain type safety
@@ -129,38 +172,60 @@ image?: string         # Optional image URL
 
 ## Knowledge Base (SQLite)
 
-A local SQLite database (`data/knowledge.db`) stores books, music, and other resources for querying at build time.
+A local SQLite database (`data/knowledge.db`) is the single source of truth for all resources.
 
-### Scripts
+### Architecture
 
-Located in `scripts/` (run with Bun, not Astro):
-
-- **`scripts/db.ts`** — SQLite schema and CRUD helpers using `bun:sqlite`
-- **`scripts/sync.ts`** — CLI for syncing data into the database
+```
+Local files (CSV, JSON) ──┐
+                          ├──▶ sync.ts ──▶ SQLite ──▶ --export-library ──▶ JSON ──▶ Astro
+API sources (Readwise, Zotero) ──┘
+```
 
 ### Sync Commands
 
 ```bash
-bun sync              # Sync all local data sources
-bun sync books        # Sync Goodreads books only
-bun sync music        # Sync Spotify tracks only
-bun sync --stats      # Show database stats
-bun sync --export all # Export all resources as JSON
+# Granular sync
+bun sync books        # Goodreads CSV → SQLite
+bun sync music        # Spotify JSON → SQLite
+bun sync readwise     # Readwise API → SQLite (slow)
+bun sync zotero       # Zotero API → SQLite (slow)
+
+# Grouped sync
+bun sync local        # books + music (fast, no API calls)
+bun sync api          # readwise + zotero (slow, rate limited)
+bun sync all          # everything
+
+# Export & stats
+bun sync --export-library   # SQLite → public/data/library.json
+bun sync --stats            # Show database stats
+bun sync --export TYPE      # Export to stdout (book|track|article|paper|all)
 ```
 
 ### Data Sources
 
-Currently syncs from **local files** (not APIs):
+| Source | Input | Type | Command |
+|--------|-------|------|---------|
+| Goodreads | `public/data/goodreads_library_export.csv` | books | `bun sync books` |
+| Spotify | `public/data/wtm.json` | tracks | `bun sync music` |
+| Readwise | API (requires `READWISE_TOKEN`) | articles, bookmarks | `bun sync readwise` |
+| Zotero | API (requires `ZOTERO_API_KEY`, `ZOTERO_USER_ID`) | papers | `bun sync zotero` |
 
-| Source | File | Type |
-|--------|------|------|
-| Goodreads | `public/data/goodreads_library_export.csv` | books |
-| Spotify | `public/data/wtm.json` | tracks |
+### API Sync Details
 
-### Future: API Integrations (not yet implemented)
+The `bun sync api` command fetches from Readwise and Zotero APIs with built-in rate limiting:
 
-- **Readwise** — Requires `READWISE_TOKEN` env var
-- **Zotero** — Requires `ZOTERO_API_KEY` env var
+| API | Rate Limit | Delay Between Requests |
+|-----|------------|------------------------|
+| Readwise | 20 req/min | 3.5 seconds |
+| Zotero | 1 req/sec | 1.1 seconds |
+
+**Features:**
+- **Pagination** — automatically fetches all pages
+- **Retry on 429** — respects `Retry-After` header, up to 3 retries
+- **Upsert** — existing resources updated, new ones inserted (no duplicates)
+
+**Typical runtime:** 2-5 minutes depending on library size.
 
 ## Don't
 
