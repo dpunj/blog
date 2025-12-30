@@ -1,0 +1,34 @@
+---
+import LibraryExplorer from "../components/library/LibraryExplorer";
+import tagHierarchyConfig from "../data/tag-hierarchy.json";
+import BaseLayout from "../layouts/BaseLayout.astro";
+import type { LibraryData, TagHierarchyConfig } from "../scripts/library";
+import { buildTagHierarchy } from "../scripts/library";
+
+const pageTitle = "Library";
+const pageDescription = "My digital garden of bookmarks, articles, and papers";
+
+// Load library data (exported from SQLite via `bun sync --export-library`)
+const libraryModule = await import("../../public/data/library.json");
+const libraryData = libraryModule.default as LibraryData;
+const resources = libraryData.resources;
+const fetchedAt = libraryData.fetchedAt;
+
+// Build tag hierarchy
+const hierarchy = buildTagHierarchy(
+	tagHierarchyConfig as TagHierarchyConfig,
+	resources,
+);
+---
+
+<BaseLayout pageTitle={pageTitle}>
+	<h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
+	<p class="text-gray-600 dark:text-gray-400 mb-8">{pageDescription}</p>
+
+	<LibraryExplorer
+		resources={resources}
+		hierarchy={hierarchy}
+		fetchedAt={fetchedAt}
+		client:load
+	/>
+</BaseLayout>
