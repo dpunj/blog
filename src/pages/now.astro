@@ -1,0 +1,192 @@
+---
+import BaseLayout from "../layouts/BaseLayout.astro";
+
+// Load now queue data at build time
+let nowData: { exportedAt: string; resources: NowResource[] } = {
+	exportedAt: new Date().toISOString(),
+	resources: [],
+};
+
+interface NowResource {
+	id: string;
+	source: string;
+	type: string;
+	title: string;
+	url: string;
+	author: string | null;
+	description: string | null;
+	imageUrl: string | null;
+	status: "now" | "next";
+	queuePriority: number | null;
+	platformStatus: string | null;
+	favorited: boolean;
+	rating: number | null;
+}
+
+try {
+	const response = await fetch(new URL("/data/now.json", import.meta.url));
+	if (response.ok) {
+		nowData = await response.json();
+	}
+} catch {
+	// File doesn't exist yet or fetch failed, use empty data
+}
+
+// In dev/build, try direct import as fallback
+if (nowData.resources.length === 0) {
+	try {
+		const file = await import("../../public/data/now.json");
+		nowData = file.default as typeof nowData;
+	} catch {
+		// Ignore
+	}
+}
+
+const { resources } = nowData;
+
+// Group by status
+const nowItems = resources.filter((r) => r.status === "now");
+const nextItems = resources.filter((r) => r.status === "next");
+
+// Group by type for display
+function groupByType(items: NowResource[]) {
+	const groups: Record<string, NowResource[]> = {};
+	for (const item of items) {
+		const type = item.type;
+		if (!groups[type]) groups[type] = [];
+		groups[type].push(item);
+	}
+	return groups;
+}
+
+const nowByType = groupByType(nowItems);
+const nextByType = groupByType(nextItems);
+
+// Type display names and emojis
+const typeInfo: Record<string, { emoji: string; label: string }> = {
+	book: { emoji: "📚", label: "Reading" },
+	movie: { emoji: "🎬", label: "Watching" },
+	game: { emoji: "🎮", label: "Playing" },
+	article: { emoji: "📰", label: "Articles" },
+	paper: { emoji: "📄", label: "Papers" },
+	video: { emoji: "📺", label: "Videos" },
+	track: { emoji: "🎵", label: "Listening" },
+	podcast: { emoji: "🎙️", label: "Podcasts" },
+};
+
+const pageTitle = "Now";
+const pageDescription = "What I'm currently consuming and what's up next.";
+---
+
+<BaseLayout pageTitle={pageTitle}>
+	<h1 class="text-4xl font-bold mb-2">{pageTitle}</h1>
+	<p class="text-gray-600 dark:text-gray-400 mb-8">{pageDescription}</p>
+
+	{resources.length === 0 ? (
+		<div class="text-gray-500 dark:text-gray-400 py-8">
+			<p>Nothing in the queue yet.</p>
+			<p class="text-sm mt-2">
+				Run <code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">bun sync all</code> then{" "}
+				<code class="bg-gray-100 dark:bg-gray-800 px-1 rounded">bun sync --export-now</code> to populate.
+			</p>
+		</div>
+	) : (
+		<>
+			{/* Currently Consuming */}
+			{nowItems.length > 0 && (
+				<section class="mb-12">
+					<h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
+						<span class="text-green-500">●</span> Now
+					</h2>
+					<div class="space-y-8">
+						{Object.entries(nowByType).map(([type, items]) => (
+							<div>
+								<h3 class="text-lg font-medium text-gray-600 dark:text-gray-400 mb-3">
+									{typeInfo[type]?.emoji || "📦"} {typeInfo[type]?.label || type}
+								</h3>
+								<ul class="space-y-3">
+									{items.map((item) => (
+										<li class="flex items-start gap-3">
+											{item.imageUrl && (
+												<img
+													src={item.imageUrl}
+													alt=""
+													class="w-12 h-16 object-cover rounded shadow-sm flex-shrink-0"
+												/>
+											)}
+											<div class="flex-1 min-w-0">
+												<a
+													href={item.url || "#"}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="font-medium hover:underline block truncate"
+												>
+													{item.title}
+												</a>
+												{item.author && (
+													<p class="text-sm text-gray-500 dark:text-gray-400 truncate">
+														{item.author}
+													</p>
+												)}
+											</div>
+											{item.favorited && (
+												<span class="text-yellow-500 flex-shrink-0" title="Favorite">★</span>
+											)}
+										</li>
+									))}
+								</ul>
+							</div>
+						))}
+					</div>
+				</section>
+			)}
+
+			{/* Up Next */}
+			{nextItems.length > 0 && (
+				<section class="mb-12">
+					<h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
+						<span class="text-blue-500">○</span> Next
+					</h2>
+					<div class="space-y-8">
+						{Object.entries(nextByType).map(([type, items]) => (
+							<div>
+								<h3 class="text-lg font-medium text-gray-600 dark:text-gray-400 mb-3">
+									{typeInfo[type]?.emoji || "📦"} {typeInfo[type]?.label || type}
+								</h3>
+								<ul class="space-y-2">
+									{items.map((item) => (
+										<li class="flex items-center gap-3">
+											<a
+												href={item.url || "#"}
+												target="_blank"
+												rel="noopener noreferrer"
+												class="hover:underline truncate"
+											>
+												{item.title}
+											</a>
+											{item.author && (
+												<span class="text-sm text-gray-500 dark:text-gray-400 truncate flex-shrink-0">
+													— {item.author}
+												</span>
+											)}
+										</li>
+									))}
+								</ul>
+							</div>
+						))}
+					</div>
+				</section>
+			)}
+		</>
+	)}
+
+	<footer class="text-sm text-gray-400 dark:text-gray-500 mt-12 pt-6 border-t border-gray-200 dark:border-gray-700">
+		<p>
+			Last updated: {new Date(nowData.exportedAt).toLocaleDateString("en-US", {
+				year: "numeric",
+				month: "long",
+				day: "numeric",
+			})}
+		</p>
+	</footer>
+</BaseLayout>

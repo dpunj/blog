@@ -61,8 +61,41 @@ export function getDb(): Database {
 
 	// Indexes for common queries
 	db.run("CREATE INDEX IF NOT EXISTS idx_resources_type ON resources(type)");
-	db.run("CREATE INDEX IF NOT EXISTS idx_resources_source ON resources(source)");
-	db.run("CREATE INDEX IF NOT EXISTS idx_resources_created ON resources(created_at)");
+	db.run(
+		"CREATE INDEX IF NOT EXISTS idx_resources_source ON resources(source)",
+	);
+	db.run(
+		"CREATE INDEX IF NOT EXISTS idx_resources_created ON resources(created_at)",
+	);
+
+	// Migration: Add Now queue columns (safe for existing DBs)
+	const columns = db.prepare("PRAGMA table_info(resources)").all() as {
+		name: string;
+	}[];
+	const columnNames = new Set(columns.map((c) => c.name));
+
+	if (!columnNames.has("status")) {
+		db.run("ALTER TABLE resources ADD COLUMN status TEXT");
+	}
+	if (!columnNames.has("status_manual")) {
+		db.run("ALTER TABLE resources ADD COLUMN status_manual INTEGER DEFAULT 0");
+	}
+	if (!columnNames.has("platform_status")) {
+		db.run("ALTER TABLE resources ADD COLUMN platform_status TEXT");
+	}
+	if (!columnNames.has("favorited")) {
+		db.run("ALTER TABLE resources ADD COLUMN favorited INTEGER DEFAULT 0");
+	}
+	if (!columnNames.has("rating")) {
+		db.run("ALTER TABLE resources ADD COLUMN rating INTEGER");
+	}
+	if (!columnNames.has("queue_priority")) {
+		db.run("ALTER TABLE resources ADD COLUMN queue_priority INTEGER");
+	}
+
+	db.run(
+		"CREATE INDEX IF NOT EXISTS idx_resources_status ON resources(status)",
+	);
 
 	return db;
 }
@@ -75,6 +108,8 @@ export type ResourceType =
 	| "paper"
 	| "book"
 	| "track"
+	| "movie"
+	| "game"
 	| "pdf"
 	| "epub"
 	| "tweet"
@@ -85,7 +120,12 @@ export type ResourceSource =
 	| "zotero"
 	| "goodreads"
 	| "spotify"
+	| "letterboxd"
+	| "rawg"
+	| "tmdb"
 	| "manual";
+
+export type ConsumptionStatus = "now" | "next" | "done" | "dropped" | null;
 
 export interface Resource {
 	id: string;
@@ -108,13 +148,21 @@ export interface Resource {
 	// Zotero-specific
 	item_type?: string;
 	publication_title?: string;
+	// Now queue fields
+	status?: ConsumptionStatus;
+	status_manual?: number;
+	platform_status?: string;
+	favorited?: number;
+	rating?: number;
+	queue_priority?: number;
 }
 
 // Insert or update a resource
 export function upsertResource(db: Database, resource: Resource): void {
 	const stmt = db.prepare(`
-		INSERT INTO resources (id, type, title, url, author, description, tags, source, source_id, metadata, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+		INSERT INTO resources (id, type, title, url, author, description, tags, source, source_id, metadata, 
+			status, status_manual, platform_status, favorited, rating, queue_priority, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
 		ON CONFLICT(id) DO UPDATE SET
 			type = excluded.type,
 			title = excluded.title,
@@ -125,6 +173,12 @@ export function upsertResource(db: Database, resource: Resource): void {
 			source = excluded.source,
 			source_id = excluded.source_id,
 			metadata = excluded.metadata,
+			platform_status = excluded.platform_status,
+			-- Only update status/priority if NOT manually curated
+			status = CASE WHEN resources.status_manual = 1 THEN resources.status ELSE excluded.status END,
+			queue_priority = CASE WHEN resources.status_manual = 1 THEN resources.queue_priority ELSE excluded.queue_priority END,
+			favorited = COALESCE(excluded.favorited, resources.favorited),
+			rating = COALESCE(excluded.rating, resources.rating),
 			updated_at = datetime('now')
 	`);
 
@@ -139,12 +193,23 @@ export function upsertResource(db: Database, resource: Resource): void {
 		resource.source,
 		resource.source_id ?? null,
 		resource.metadata ? JSON.stringify(resource.metadata) : null,
+		resource.status ?? null,
+		resource.status_manual ?? 0,
+		resource.platform_status ?? null,
+		resource.favorited ?? 0,
+		resource.rating ?? null,
+		resource.queue_priority ?? null,
 	);
 }
 
 // Get all resources of a type
-export function getResourcesByType(db: Database, type: Resource["type"]): Resource[] {
-	const stmt = db.prepare("SELECT * FROM resources WHERE type = ? ORDER BY created_at DESC");
+export function getResourcesByType(
+	db: Database,
+	type: Resource["type"],
+): Resource[] {
+	const stmt = db.prepare(
+		"SELECT * FROM resources WHERE type = ? ORDER BY created_at DESC",
+	);
 	const rows = stmt.all(type) as Record<string, unknown>[];
 
 	return rows.map((row) => ({
@@ -169,7 +234,7 @@ export function getAllResources(db: Database): Resource[] {
 // Get library resources (readwise + zotero)
 export function getLibraryResources(db: Database): Resource[] {
 	const stmt = db.prepare(
-		"SELECT * FROM resources WHERE source IN ('readwise', 'zotero') ORDER BY created_at DESC"
+		"SELECT * FROM resources WHERE source IN ('readwise', 'zotero') ORDER BY created_at DESC",
 	);
 	const rows = stmt.all() as Record<string, unknown>[];
 
@@ -181,8 +246,13 @@ export function getLibraryResources(db: Database): Resource[] {
 }
 
 // Get resources by source
-export function getResourcesBySource(db: Database, source: ResourceSource): Resource[] {
-	const stmt = db.prepare("SELECT * FROM resources WHERE source = ? ORDER BY created_at DESC");
+export function getResourcesBySource(
+	db: Database,
+	source: ResourceSource,
+): Resource[] {
+	const stmt = db.prepare(
+		"SELECT * FROM resources WHERE source = ? ORDER BY created_at DESC",
+	);
 	const rows = stmt.all(source) as Record<string, unknown>[];
 
 	return rows.map((row) => ({
@@ -206,6 +276,43 @@ export function getStats(db: Database) {
 		GROUP BY type
 	`);
 	return stmt.all();
+}
+
+// Get resources in the Now queue (status = 'now' or 'next')
+export function getNowResources(db: Database): Resource[] {
+	const stmt = db.prepare(`
+		SELECT * FROM resources 
+		WHERE status IN ('now', 'next')
+		ORDER BY 
+			CASE status WHEN 'now' THEN 0 WHEN 'next' THEN 1 END,
+			queue_priority ASC NULLS LAST,
+			created_at DESC
+	`);
+	const rows = stmt.all() as Record<string, unknown>[];
+
+	return rows.map((row) => ({
+		...row,
+		tags: row.tags ? JSON.parse(row.tags as string) : undefined,
+		metadata: row.metadata ? JSON.parse(row.metadata as string) : undefined,
+	})) as Resource[];
+}
+
+// Update resource status (manual curation)
+export function updateResourceStatus(
+	db: Database,
+	id: string,
+	status: ConsumptionStatus,
+	priority?: number,
+): void {
+	const stmt = db.prepare(`
+		UPDATE resources 
+		SET status = ?, 
+			status_manual = 1, 
+			queue_priority = COALESCE(?, queue_priority),
+			updated_at = datetime('now')
+		WHERE id = ?
+	`);
+	stmt.run(status, priority ?? null, id);
 }
 
 // CLI entry point

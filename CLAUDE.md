@@ -129,6 +129,10 @@ Readwise/Zotero APIs → sync.ts → SQLite → --export-library → library.jso
 READWISE_TOKEN=xxx
 ZOTERO_API_KEY=xxx
 ZOTERO_USER_ID=xxx
+LETTERBOXD_USERNAME=xxx
+RAWG_API_KEY=xxx
+RAWG_USERNAME=xxx
+TMDB_API_KEY=xxx
 ```
 
 **Updating the Library:**
@@ -190,16 +194,19 @@ bun sync books        # Goodreads CSV → SQLite
 bun sync music        # Spotify JSON → SQLite
 bun sync readwise     # Readwise API → SQLite (slow)
 bun sync zotero       # Zotero API → SQLite (slow)
+bun sync letterboxd   # Letterboxd RSS → SQLite
+bun sync rawg         # RAWG API → SQLite
 
 # Grouped sync
 bun sync local        # books + music (fast, no API calls)
-bun sync api          # readwise + zotero (slow, rate limited)
+bun sync api          # readwise + zotero + letterboxd + rawg (slow, rate limited)
 bun sync all          # everything
 
 # Export & stats
 bun sync --export-library   # SQLite → public/data/library.json
+bun sync --export-now       # SQLite → public/data/now.json (for /now page)
 bun sync --stats            # Show database stats
-bun sync --export TYPE      # Export to stdout (book|track|article|paper|all)
+bun sync --export TYPE      # Export to stdout (book|track|movie|game|article|paper|all)
 ```
 
 ### Data Sources
@@ -210,6 +217,9 @@ bun sync --export TYPE      # Export to stdout (book|track|article|paper|all)
 | Spotify | `public/data/wtm.json` | tracks | `bun sync music` |
 | Readwise | API (requires `READWISE_TOKEN`) | articles, bookmarks | `bun sync readwise` |
 | Zotero | API (requires `ZOTERO_API_KEY`, `ZOTERO_USER_ID`) | papers | `bun sync zotero` |
+| Letterboxd | RSS (requires `LETTERBOXD_USERNAME`) | movies (watched) | `bun sync letterboxd` |
+| TMDB | API (requires `TMDB_API_KEY`) | movies (queue) | `bun sync tmdb search/add` |
+| RAWG | API (requires `RAWG_API_KEY`, `RAWG_USERNAME`) | games | `bun sync rawg` |
 
 ### API Sync Details
 
@@ -226,6 +236,35 @@ The `bun sync api` command fetches from Readwise and Zotero APIs with built-in r
 - **Upsert** — existing resources updated, new ones inserted (no duplicates)
 
 **Typical runtime:** 2-5 minutes depending on library size.
+
+### Now Page (Media Queue)
+
+A unified view of what you're currently consuming across all media types: books, movies, games, articles, etc.
+
+**Statuses:**
+| Status | Meaning |
+|--------|---------|
+| `now` | Currently consuming |
+| `next` | Up next in queue |
+| `done` | Finished |
+| `dropped` | Abandoned |
+| `null` | In library (synced but not curated) |
+
+**Auto-mapping from platforms:**
+- Goodreads `currently-reading` → `now`
+- Goodreads `read` → `done`
+- RAWG `playing` → `now`
+- RAWG `completed` → `done`
+- Letterboxd diary → `done`
+
+**Manual curation:**
+- Edit `data/now-queue.json` to override auto-synced statuses
+- Use `bun scripts/db.ts` to update status directly in SQLite
+
+**Workflow:**
+1. Run `bun sync all` to fetch latest from all sources
+2. Run `bun sync --export-now` to regenerate `/now` page data
+3. View at `/now`
 
 ## Don't
 
