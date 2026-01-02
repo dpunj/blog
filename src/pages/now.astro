@@ -62,25 +62,35 @@ function groupByType(items: NowResource[]) {
 const nowByType = groupByType(nowItems);
 const nextByType = groupByType(nextItems);
 
-// Type display names and emojis
-const typeInfo: Record<string, { emoji: string; label: string }> = {
-	book: { emoji: "📚", label: "Reading" },
-	movie: { emoji: "🎬", label: "Watching" },
-	game: { emoji: "🎮", label: "Playing" },
-	article: { emoji: "📰", label: "Articles" },
-	paper: { emoji: "📄", label: "Papers" },
-	video: { emoji: "📺", label: "Videos" },
-	track: { emoji: "🎵", label: "Listening" },
-	podcast: { emoji: "🎙️", label: "Podcasts" },
+// Type display config with aspect ratios
+const typeConfig: Record<string, { emoji: string; label: string; showPosters: boolean; aspect: string }> = {
+	book: { emoji: "📚", label: "Reading", showPosters: true, aspect: "aspect-[2/3]" },
+	movie: { emoji: "🎬", label: "Film", showPosters: true, aspect: "aspect-[2/3]" },
+	game: { emoji: "🎮", label: "Playing", showPosters: true, aspect: "aspect-[2/3]" },
+	album: { emoji: "🎵", label: "Albums", showPosters: true, aspect: "aspect-square" },
+	article: { emoji: "📰", label: "Articles", showPosters: false, aspect: "" },
+	paper: { emoji: "📄", label: "Papers", showPosters: false, aspect: "" },
+	video: { emoji: "📺", label: "Videos", showPosters: false, aspect: "" },
 };
 
+// Preferred order for media types (no tracks, only albums)
+const typeOrder = ["book", "movie", "game", "album", "article", "paper", "video"];
+
+function sortedTypes(groups: Record<string, NowResource[]>) {
+	return Object.entries(groups).sort(([a], [b]) => {
+		const aIdx = typeOrder.indexOf(a);
+		const bIdx = typeOrder.indexOf(b);
+		return (aIdx === -1 ? 999 : aIdx) - (bIdx === -1 ? 999 : bIdx);
+	});
+}
+
 const pageTitle = "Now";
-const pageDescription = "What I'm currently consuming and what's up next.";
+const pageDescription = "What I'm consuming and what's up next.";
 ---
 
 <BaseLayout pageTitle={pageTitle}>
 	<h1 class="text-4xl font-bold mb-2">{pageTitle}</h1>
-	<p class="text-gray-600 dark:text-gray-400 mb-8">{pageDescription}</p>
+	<p class="text-gray-600 dark:text-gray-400 mb-10">{pageDescription}</p>
 
 	{resources.length === 0 ? (
 		<div class="text-gray-500 dark:text-gray-400 py-8">
@@ -91,96 +101,158 @@ const pageDescription = "What I'm currently consuming and what's up next.";
 			</p>
 		</div>
 	) : (
-		<>
+		<div class="space-y-16">
 			{/* Currently Consuming */}
 			{nowItems.length > 0 && (
-				<section class="mb-12">
-					<h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
-						<span class="text-green-500">●</span> Now
+				<section>
+					<h2 class="text-2xl font-semibold mb-8 flex items-center gap-3">
+						<span class="w-3 h-3 bg-green-500 rounded-full"></span>
+						Now
 					</h2>
-					<div class="space-y-8">
-						{Object.entries(nowByType).map(([type, items]) => (
-							<div>
-								<h3 class="text-lg font-medium text-gray-600 dark:text-gray-400 mb-3">
-									{typeInfo[type]?.emoji || "📦"} {typeInfo[type]?.label || type}
-								</h3>
-								<ul class="space-y-3">
-									{items.map((item) => (
-										<li class="flex items-start gap-3">
-											{item.imageUrl && (
-												<img
-													src={item.imageUrl}
-													alt=""
-													class="w-12 h-16 object-cover rounded shadow-sm flex-shrink-0"
-												/>
-											)}
-											<div class="flex-1 min-w-0">
+					<div class="space-y-10">
+						{sortedTypes(nowByType).map(([type, items]) => {
+							const config = typeConfig[type] || { emoji: "📦", label: type, showPosters: false };
+							return (
+								<div>
+									<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">
+										{config.emoji} {config.label}
+									</h3>
+									{config.showPosters ? (
+										<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+											{items.map((item) => (
 												<a
 													href={item.url || "#"}
 													target="_blank"
 													rel="noopener noreferrer"
-													class="font-medium hover:underline block truncate"
+													class="group block"
 												>
-													{item.title}
-												</a>
-												{item.author && (
-													<p class="text-sm text-gray-500 dark:text-gray-400 truncate">
-														{item.author}
+													<div class="aspect-[2/3] bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden shadow-md group-hover:shadow-lg transition-shadow">
+														{item.imageUrl ? (
+															<img
+																src={item.imageUrl}
+																alt={item.title}
+																class="w-full h-full object-cover"
+															/>
+														) : (
+															<div class="w-full h-full flex items-center justify-center text-4xl">
+																{config.emoji}
+															</div>
+														)}
+													</div>
+													<p class="mt-2 text-sm font-medium truncate group-hover:underline">
+														{item.title}
 													</p>
-												)}
-											</div>
-											{item.favorited && (
-												<span class="text-yellow-500 flex-shrink-0" title="Favorite">★</span>
-											)}
-										</li>
-									))}
-								</ul>
-							</div>
-						))}
+													{item.author && (
+														<p class="text-xs text-gray-500 dark:text-gray-400 truncate">
+															{item.author}
+														</p>
+													)}
+												</a>
+											))}
+										</div>
+									) : (
+										<ul class="space-y-2">
+											{items.map((item) => (
+												<li class="flex items-center gap-2">
+													<a
+														href={item.url || "#"}
+														target="_blank"
+														rel="noopener noreferrer"
+														class="hover:underline"
+													>
+														{item.title}
+													</a>
+													{item.author && (
+														<span class="text-sm text-gray-500 dark:text-gray-400">
+															— {item.author}
+														</span>
+													)}
+												</li>
+											))}
+										</ul>
+									)}
+								</div>
+							);
+						})}
 					</div>
 				</section>
 			)}
 
 			{/* Up Next */}
 			{nextItems.length > 0 && (
-				<section class="mb-12">
-					<h2 class="text-2xl font-semibold mb-6 flex items-center gap-2">
-						<span class="text-blue-500">○</span> Next
+				<section>
+					<h2 class="text-2xl font-semibold mb-8 flex items-center gap-3">
+						<span class="w-3 h-3 border-2 border-blue-500 rounded-full"></span>
+						Up Next
 					</h2>
-					<div class="space-y-8">
-						{Object.entries(nextByType).map(([type, items]) => (
-							<div>
-								<h3 class="text-lg font-medium text-gray-600 dark:text-gray-400 mb-3">
-									{typeInfo[type]?.emoji || "📦"} {typeInfo[type]?.label || type}
-								</h3>
-								<ul class="space-y-2">
-									{items.map((item) => (
-										<li class="flex items-center gap-3">
-											<a
-												href={item.url || "#"}
-												target="_blank"
-												rel="noopener noreferrer"
-												class="hover:underline truncate"
-											>
-												{item.title}
-											</a>
-											{item.author && (
-												<span class="text-sm text-gray-500 dark:text-gray-400 truncate flex-shrink-0">
-													— {item.author}
-												</span>
-											)}
-										</li>
-									))}
-								</ul>
-							</div>
-						))}
+					<div class="space-y-10">
+						{sortedTypes(nextByType).map(([type, items]) => {
+							const config = typeConfig[type] || { emoji: "📦", label: type, showPosters: false };
+							return (
+								<div>
+									<h3 class="text-sm font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide mb-4">
+										{config.emoji} {config.label}
+									</h3>
+									{config.showPosters ? (
+										<div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+											{items.map((item) => (
+												<a
+													href={item.url || "#"}
+													target="_blank"
+													rel="noopener noreferrer"
+													class="group block"
+													title={item.title}
+												>
+													<div class="aspect-[2/3] bg-gray-100 dark:bg-gray-800 rounded-lg overflow-hidden shadow-md group-hover:shadow-lg transition-shadow">
+														{item.imageUrl ? (
+															<img
+																src={item.imageUrl}
+																alt={item.title}
+																class="w-full h-full object-cover"
+															/>
+														) : (
+															<div class="w-full h-full flex items-center justify-center text-4xl">
+																{config.emoji}
+															</div>
+														)}
+													</div>
+													<p class="mt-2 text-sm font-medium truncate group-hover:underline">
+														{item.title}
+													</p>
+												</a>
+											))}
+										</div>
+									) : (
+										<ul class="space-y-1">
+											{items.map((item) => (
+												<li class="flex items-center gap-2 text-sm">
+													<a
+														href={item.url || "#"}
+														target="_blank"
+														rel="noopener noreferrer"
+														class="hover:underline"
+													>
+														{item.title}
+													</a>
+													{item.author && (
+														<span class="text-gray-500 dark:text-gray-400">
+															— {item.author}
+														</span>
+													)}
+												</li>
+											))}
+										</ul>
+									)}
+								</div>
+							);
+						})}
 					</div>
 				</section>
 			)}
-		</>
+		</div>
 	)}
 
-	<footer class="text-sm text-gray-400 dark:text-gray-500 mt-12 pt-6 border-t border-gray-200 dark:border-gray-700">
+	<footer class="text-sm text-gray-400 dark:text-gray-500 mt-16 pt-6 border-t border-gray-200 dark:border-gray-700">
 		<p>
 			Last updated: {new Date(nowData.exportedAt).toLocaleDateString("en-US", {
 				year: "numeric",

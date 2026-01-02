@@ -92,6 +92,12 @@ export function getDb(): Database {
 	if (!columnNames.has("queue_priority")) {
 		db.run("ALTER TABLE resources ADD COLUMN queue_priority INTEGER");
 	}
+	if (!columnNames.has("image_url")) {
+		db.run("ALTER TABLE resources ADD COLUMN image_url TEXT");
+	}
+	if (!columnNames.has("date_published")) {
+		db.run("ALTER TABLE resources ADD COLUMN date_published TEXT");
+	}
 
 	db.run(
 		"CREATE INDEX IF NOT EXISTS idx_resources_status ON resources(status)",
@@ -108,6 +114,7 @@ export type ResourceType =
 	| "paper"
 	| "book"
 	| "track"
+	| "album"
 	| "movie"
 	| "game"
 	| "pdf"
@@ -161,8 +168,8 @@ export interface Resource {
 export function upsertResource(db: Database, resource: Resource): void {
 	const stmt = db.prepare(`
 		INSERT INTO resources (id, type, title, url, author, description, tags, source, source_id, metadata, 
-			status, status_manual, platform_status, favorited, rating, queue_priority, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+			status, status_manual, platform_status, favorited, rating, queue_priority, image_url, date_published, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
 		ON CONFLICT(id) DO UPDATE SET
 			type = excluded.type,
 			title = excluded.title,
@@ -174,6 +181,8 @@ export function upsertResource(db: Database, resource: Resource): void {
 			source_id = excluded.source_id,
 			metadata = excluded.metadata,
 			platform_status = excluded.platform_status,
+			image_url = COALESCE(excluded.image_url, resources.image_url),
+			date_published = COALESCE(excluded.date_published, resources.date_published),
 			-- Only update status/priority if NOT manually curated
 			status = CASE WHEN resources.status_manual = 1 THEN resources.status ELSE excluded.status END,
 			queue_priority = CASE WHEN resources.status_manual = 1 THEN resources.queue_priority ELSE excluded.queue_priority END,
@@ -199,6 +208,8 @@ export function upsertResource(db: Database, resource: Resource): void {
 		resource.favorited ?? 0,
 		resource.rating ?? null,
 		resource.queue_priority ?? null,
+		resource.image_url ?? null,
+		resource.date_published ?? null,
 	);
 }
 

@@ -22,6 +22,8 @@ const LETTERBOXD_USERNAME = process.env.LETTERBOXD_USERNAME;
 const RAWG_API_KEY = process.env.RAWG_API_KEY;
 const RAWG_USERNAME = process.env.RAWG_USERNAME;
 const TMDB_API_KEY = process.env.TMDB_API_KEY;
+const SPOTIFY_CLIENT_ID = process.env.SPOTIFY_CLIENT_ID;
+const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 
 const READWISE_DELAY_MS = 3500; // ~17 requests/minute (limit is 20)
 const ZOTERO_DELAY_MS = 1100; // 1 request/sec per API guidance
@@ -113,6 +115,8 @@ async function syncBooks(db: ReturnType<typeof getDb>) {
 		const exclusiveShelf = fields[colIndex("Exclusive Shelf")];
 		const review = fields[colIndex("My Review")];
 		const bookId = fields[colIndex("Book Id")];
+		const isbn = fields[colIndex("ISBN")]?.replace(/[="]/g, "");
+		const isbn13 = fields[colIndex("ISBN13")]?.replace(/[="]/g, "");
 
 		if (!title) continue;
 
@@ -132,6 +136,12 @@ async function syncBooks(db: ReturnType<typeof getDb>) {
 			status = "done";
 		}
 
+		// Get book cover from Open Library (ISBN-based, free API)
+		const coverIsbn = isbn13 || isbn;
+		const imageUrl = coverIsbn
+			? `https://covers.openlibrary.org/b/isbn/${coverIsbn}-L.jpg`
+			: undefined;
+
 		const resource: Resource = {
 			id: `goodreads-${bookId || Buffer.from(title + author).toString("base64url").slice(0, 16)}`,
 			type: "book",
@@ -147,9 +157,11 @@ async function syncBooks(db: ReturnType<typeof getDb>) {
 			source_id: bookId || title,
 			platform_status: platformStatus,
 			status,
+			image_url: imageUrl,
 			metadata: {
 				rating: Number.parseInt(rating) || 0,
 				dateRead: dateRead || null,
+				isbn: coverIsbn || null,
 			},
 		};
 
@@ -764,6 +776,150 @@ async function tmdbAddById(db: ReturnType<typeof getDb>, id: number, status: "no
 	console.log(`✅ Added "${movie.title}" (${year}) to queue with status: ${status}`);
 }
 
+// ============================================================================
+// Spotify API Types & Functions (Albums)
+// ============================================================================
+
+interface SpotifyAlbum {
+	id: string;
+	name: string;
+	artists: { name: string }[];
+	images: { url: string; width: number }[];
+	release_date: string;
+	total_tracks: number;
+	external_urls: { spotify: string };
+}
+
+interface SpotifySearchResponse {
+	albums: {
+		items: SpotifyAlbum[];
+	};
+}
+
+let spotifyAccessToken: string | null = null;
+
+async function getSpotifyToken(): Promise<string | null> {
+	if (spotifyAccessToken) return spotifyAccessToken;
+
+	if (!SPOTIFY_CLIENT_ID || !SPOTIFY_CLIENT_SECRET) {
+		console.log("❌ SPOTIFY_CLIENT_ID or SPOTIFY_CLIENT_SECRET not set");
+		return null;
+	}
+
+	const response = await fetch("https://accounts.spotify.com/api/token", {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/x-www-form-urlencoded",
+			Authorization: `Basic ${Buffer.from(`${SPOTIFY_CLIENT_ID}:${SPOTIFY_CLIENT_SECRET}`).toString("base64")}`,
+		},
+		body: "grant_type=client_credentials",
+	});
+
+	if (!response.ok) {
+		throw new Error(`Spotify auth error: ${response.status} ${response.statusText}`);
+	}
+
+	const data = await response.json();
+	spotifyAccessToken = data.access_token;
+	return spotifyAccessToken;
+}
+
+async function spotifySearchAlbums(query: string): Promise<SpotifyAlbum[]> {
+	const token = await getSpotifyToken();
+	if (!token) return [];
+
+	const url = `https://api.spotify.com/v1/search?type=album&limit=10&q=${encodeURIComponent(query)}`;
+	const response = await fetch(url, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+
+	if (!response.ok) {
+		throw new Error(`Spotify API error: ${response.status} ${response.statusText}`);
+	}
+
+	const data: SpotifySearchResponse = await response.json();
+	return data.albums.items;
+}
+
+async function spotifyGetAlbum(id: string): Promise<SpotifyAlbum | null> {
+	const token = await getSpotifyToken();
+	if (!token) return null;
+
+	const url = `https://api.spotify.com/v1/albums/${id}`;
+	const response = await fetch(url, {
+		headers: { Authorization: `Bearer ${token}` },
+	});
+
+	if (!response.ok) {
+		if (response.status === 404) return null;
+		throw new Error(`Spotify API error: ${response.status} ${response.statusText}`);
+	}
+
+	return response.json();
+}
+
+function spotifyAlbumToResource(album: SpotifyAlbum, status: "now" | "next" = "next"): Resource {
+	const imageUrl = album.images.find((img) => img.width === 300)?.url 
+		|| album.images[0]?.url 
+		|| undefined;
+
+	return {
+		id: `spotify-album-${album.id}`,
+		type: "album",
+		title: album.name,
+		author: album.artists.map((a) => a.name).join(", "),
+		url: album.external_urls.spotify,
+		source: "spotify",
+		source_id: album.id,
+		image_url: imageUrl,
+		platform_status: undefined,
+		status,
+		status_manual: 1,
+		date_published: album.release_date || undefined,
+		metadata: {
+			total_tracks: album.total_tracks,
+		},
+	};
+}
+
+async function albumSearch(db: ReturnType<typeof getDb>, query: string) {
+	console.log(`🔍 Searching Spotify for "${query}"...`);
+	const results = await spotifySearchAlbums(query);
+
+	if (results.length === 0) {
+		console.log("  No results found.");
+		return;
+	}
+
+	console.log("\n  Results:");
+	for (let i = 0; i < results.length; i++) {
+		const a = results[i];
+		const year = a.release_date?.split("-")[0] || "????";
+		const artists = a.artists.map((x) => x.name).join(", ");
+		console.log(`  ${i + 1}. ${a.name} — ${artists} (${year}) - ID: ${a.id}`);
+	}
+
+	console.log(`\n  To add an album, run: bun sync album add <id>`);
+	console.log(`  Example: bun sync album add ${results[0].id}`);
+}
+
+async function albumAddById(db: ReturnType<typeof getDb>, id: string, status: "now" | "next" = "next") {
+	console.log(`🎵 Fetching album ${id} from Spotify...`);
+	const album = await spotifyGetAlbum(id);
+
+	if (!album) {
+		console.log(`  Album with ID ${id} not found.`);
+		return;
+	}
+
+	const resource = spotifyAlbumToResource(album, status);
+	upsertResource(db, resource);
+
+	const year = album.release_date?.split("-")[0] || "????";
+	const artists = album.artists.map((a) => a.name).join(", ");
+	console.log(`✅ Added "${album.name}" by ${artists} (${year}) to queue with status: ${status}`);
+}
+
 // CLI
 const { values, positionals } = parseArgs({
 	args: Bun.argv.slice(2),
@@ -798,6 +954,10 @@ Commands:
   tmdb search "query"     Search TMDB for movies
   tmdb add <id>           Add movie to queue (status: next)
   tmdb add <id> now       Add movie as currently watching
+
+  album search "query"    Search Spotify for albums
+  album add <id>          Add album to queue (status: next)
+  album add <id> now      Add album as currently listening
 
 Options:
   -s, --stats           Show database stats
@@ -1011,6 +1171,31 @@ async function main() {
 				console.log("TMDB commands:");
 				console.log('  bun sync tmdb search "movie title"');
 				console.log("  bun sync tmdb add <id> [now|next]");
+			}
+			db.close();
+			return;
+		}
+		case "album": {
+			const subcommand = positionals[1];
+			if (subcommand === "search") {
+				const query = positionals.slice(2).join(" ");
+				if (!query) {
+					console.log("Usage: bun sync album search \"album name\"");
+					break;
+				}
+				await albumSearch(db, query);
+			} else if (subcommand === "add") {
+				const id = positionals[2];
+				if (!id) {
+					console.log("Usage: bun sync album add <spotify_id> [now|next]");
+					break;
+				}
+				const status = positionals[3] === "now" ? "now" : "next";
+				await albumAddById(db, id, status);
+			} else {
+				console.log("Album commands:");
+				console.log('  bun sync album search "album name"');
+				console.log("  bun sync album add <spotify_id> [now|next]");
 			}
 			db.close();
 			return;
