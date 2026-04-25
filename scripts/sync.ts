@@ -1,4 +1,5 @@
-import { writeFileSync } from "node:fs";
+import { mkdirSync, renameSync, writeFileSync } from "node:fs";
+import { dirname } from "node:path";
 import { parseArgs } from "node:util";
 import {
 	exportAsJson,
@@ -6,8 +7,10 @@ import {
 	getLibraryResources,
 	getNowResources,
 	getStats,
+	getSyncState,
 	type Resource,
 	type ResourceType,
+	saveSyncState,
 	upsertResource,
 } from "./db";
 
@@ -27,10 +30,78 @@ const SPOTIFY_CLIENT_SECRET = process.env.SPOTIFY_CLIENT_SECRET;
 
 const READWISE_DELAY_MS = 3500; // ~17 requests/minute (limit is 20)
 const ZOTERO_DELAY_MS = 1100; // 1 request/sec per API guidance
-const MAX_RETRIES = 3;
+const MAX_RETRIES = 4;
+const REQUEST_TIMEOUT_MS = 60_000;
+const MAX_RETRY_WAIT_MS = 120_000;
+const INCREMENTAL_OVERLAP_MS = 5 * 60 * 1000;
 
 function delay(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function nowIso(): string {
+	return new Date().toISOString();
+}
+
+function formatDuration(ms: number): string {
+	const seconds = Math.round(ms / 1000);
+	if (seconds < 60) return `${seconds}s`;
+	const minutes = Math.floor(seconds / 60);
+	const remainingSeconds = seconds % 60;
+	return `${minutes}m ${remainingSeconds}s`;
+}
+
+function normalizeIsoDate(value?: string | null): string | undefined {
+	if (!value) return undefined;
+	const date = new Date(value);
+	return Number.isNaN(date.getTime()) ? value : date.toISOString();
+}
+
+function withOverlap(timestamp?: string): string | undefined {
+	if (!timestamp) return undefined;
+	const date = new Date(timestamp);
+	if (Number.isNaN(date.getTime())) return timestamp;
+	return new Date(date.getTime() - INCREMENTAL_OVERLAP_MS).toISOString();
+}
+
+function sanitizeUrl(url: string): string {
+	try {
+		const parsed = new URL(url);
+		return `${parsed.origin}${parsed.pathname}`;
+	} catch {
+		return url.split("?")[0];
+	}
+}
+
+function parseRetryAfter(header: string | null): number | undefined {
+	if (!header) return undefined;
+	const seconds = Number.parseInt(header, 10);
+	if (!Number.isNaN(seconds)) return seconds * 1000;
+
+	const date = new Date(header);
+	if (!Number.isNaN(date.getTime())) {
+		return Math.max(0, date.getTime() - Date.now());
+	}
+
+	return undefined;
+}
+
+function getRetryWaitMs(
+	response: Response | undefined,
+	attempt: number,
+): number {
+	const retryAfter = parseRetryAfter(
+		response?.headers.get("Retry-After") ?? null,
+	);
+	if (retryAfter !== undefined) return Math.min(retryAfter, MAX_RETRY_WAIT_MS);
+
+	const exponential = Math.min(2 ** attempt * 1000, 30_000);
+	const jitter = Math.floor(Math.random() * 1000);
+	return Math.min(exponential + jitter, MAX_RETRY_WAIT_MS);
+}
+
+function isRetryableStatus(status: number): boolean {
+	return [408, 429, 500, 502, 503, 504].includes(status);
 }
 
 // Parse a single CSV line handling quoted fields
@@ -68,17 +139,62 @@ async function fetchWithRetry(
 	options: RequestInit,
 	retries = MAX_RETRIES,
 ): Promise<Response> {
-	const response = await fetch(url, options);
+	for (let attempt = 0; attempt <= retries; attempt++) {
+		const controller = new AbortController();
+		const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
 
-	if (response.status === 429 && retries > 0) {
-		const retryAfter = response.headers.get("Retry-After");
-		const waitMs = retryAfter ? Number.parseInt(retryAfter, 10) * 1000 : 60000;
-		console.log(`  Rate limited, waiting ${waitMs / 1000}s...`);
-		await delay(waitMs);
-		return fetchWithRetry(url, options, retries - 1);
+		try {
+			const response = await fetch(url, {
+				...options,
+				signal: controller.signal,
+			});
+
+			if (!isRetryableStatus(response.status) || attempt === retries) {
+				return response;
+			}
+
+			const waitMs = getRetryWaitMs(response, attempt);
+			console.log(
+				`  ${response.status} from ${sanitizeUrl(url)}; retry ${attempt + 1}/${retries} in ${formatDuration(waitMs)}`,
+			);
+			await delay(waitMs);
+		} catch (error) {
+			if (attempt === retries) throw error;
+
+			const waitMs = getRetryWaitMs(undefined, attempt);
+			const message = error instanceof Error ? error.message : String(error);
+			console.log(
+				`  Request failed for ${sanitizeUrl(url)} (${message}); retry ${attempt + 1}/${retries} in ${formatDuration(waitMs)}`,
+			);
+			await delay(waitMs);
+		} finally {
+			clearTimeout(timeout);
+		}
 	}
 
-	return response;
+	throw new Error(
+		`Request failed after ${retries + 1} attempts: ${sanitizeUrl(url)}`,
+	);
+}
+
+async function requireOk(response: Response, source: string): Promise<void> {
+	if (response.ok) return;
+
+	const body = await response.text().catch(() => "");
+	const detail = body ? ` — ${body.slice(0, 500)}` : "";
+	throw new Error(
+		`${source} API error: ${response.status} ${response.statusText}${detail}`,
+	);
+}
+
+function upsertResourceBatch(
+	db: ReturnType<typeof getDb>,
+	resources: Resource[],
+): void {
+	const insertMany = db.transaction((batch: Resource[]) => {
+		for (const resource of batch) upsertResource(db, resource);
+	});
+	insertMany(resources);
 }
 
 // Parse Goodreads CSV (reusing logic from src/scripts/books.ts)
@@ -231,6 +347,7 @@ interface ReadwiseDocument {
 	summary: string | null;
 	image_url: string | null;
 	created_at: string;
+	updated_at?: string | null;
 	published_date: string | null;
 	category: string;
 	tags: ReadwiseTag[];
@@ -254,68 +371,126 @@ const READWISE_CATEGORY_MAP: Record<string, ResourceType> = {
 	rss: "article",
 };
 
-async function syncReadwise(db: ReturnType<typeof getDb>) {
+interface ReadwiseSyncOptions {
+	full?: boolean;
+	since?: string;
+}
+
+function readwiseDocToResource(
+	doc: ReadwiseDocument,
+	seenAt: string,
+): Resource {
+	const tags = Array.isArray(doc.tags)
+		? doc.tags.map((t) => t.name).filter(Boolean)
+		: [];
+
+	return {
+		id: `rw-${doc.id}`,
+		type: READWISE_CATEGORY_MAP[doc.category] || "bookmark",
+		title: doc.title || "Untitled",
+		url: doc.url || undefined,
+		author: doc.author || undefined,
+		description: doc.summary || undefined,
+		tags,
+		source: "readwise",
+		source_id: doc.id,
+		image_url: doc.image_url || undefined,
+		reading_progress: doc.reading_progress,
+		date_published: normalizeIsoDate(doc.published_date),
+		source_created_at: normalizeIsoDate(doc.created_at),
+		source_updated_at: normalizeIsoDate(doc.updated_at),
+		last_seen_at: seenAt,
+		metadata: {
+			category: doc.category,
+			created_at: doc.created_at,
+			updated_at: doc.updated_at ?? null,
+		},
+	};
+}
+
+async function syncReadwise(
+	db: ReturnType<typeof getDb>,
+	options: ReadwiseSyncOptions = {},
+) {
 	if (!READWISE_TOKEN) {
 		console.log("📚 READWISE_TOKEN not set, skipping Readwise sync");
 		return 0;
 	}
 
+	const startedAt = nowIso();
+	const startedMs = Date.now();
+	const state = getSyncState(db, "readwise");
+	const incrementalSince = options.full
+		? undefined
+		: withOverlap(
+				options.since || state?.high_water_mark || state?.last_success_at,
+			);
+
 	console.log("📚 Fetching Readwise documents...");
-	const docs: ReadwiseDocument[] = [];
+	console.log(
+		incrementalSince
+			? `  Mode: incremental since ${incrementalSince}`
+			: "  Mode: full sync",
+	);
+
 	let cursor: string | null = null;
+	let count = 0;
+	let page = 0;
+	let latestSourceUpdate: string | undefined;
 
 	do {
 		const url = new URL("https://readwise.io/api/v3/list/");
 		if (cursor) url.searchParams.set("pageCursor", cursor);
+		if (incrementalSince)
+			url.searchParams.set("updatedAfter", incrementalSince);
 
 		const response = await fetchWithRetry(url.toString(), {
 			headers: { Authorization: `Token ${READWISE_TOKEN}` },
 		});
-
-		if (!response.ok) {
-			throw new Error(
-				`Readwise API error: ${response.status} ${response.statusText}`,
-			);
-		}
+		await requireOk(response, "Readwise");
 
 		const data: ReadwiseResponse = await response.json();
-		docs.push(...data.results);
-		cursor = data.nextPageCursor;
+		const resources = data.results.map((doc) => {
+			const updatedAt =
+				normalizeIsoDate(doc.updated_at) || normalizeIsoDate(doc.created_at);
+			if (
+				updatedAt &&
+				(!latestSourceUpdate || updatedAt > latestSourceUpdate)
+			) {
+				latestSourceUpdate = updatedAt;
+			}
+			return readwiseDocToResource(doc, startedAt);
+		});
 
-		console.log(`  Fetched ${docs.length} documents...`);
+		if (resources.length > 0) upsertResourceBatch(db, resources);
+
+		cursor = data.nextPageCursor;
+		count += resources.length;
+		page++;
+
+		console.log(
+			`  Page ${page}: ${resources.length} docs (${count} total, ${formatDuration(Date.now() - startedMs)}, ${cursor ? "more" : "done"})`,
+		);
 
 		if (cursor) await delay(READWISE_DELAY_MS);
 	} while (cursor);
 
-	let count = 0;
-	for (const doc of docs) {
-		const tags = Array.isArray(doc.tags)
-			? doc.tags.map((t) => t.name).filter(Boolean)
-			: [];
+	saveSyncState(db, {
+		source: "readwise",
+		last_started_at: startedAt,
+		last_success_at: nowIso(),
+		high_water_mark: startedAt,
+		metadata: {
+			count,
+			full: !incrementalSince,
+			latestSourceUpdate: latestSourceUpdate ?? null,
+			durationMs: Date.now() - startedMs,
+		},
+	});
 
-		const resource: Resource = {
-			id: `rw-${doc.id}`,
-			type: READWISE_CATEGORY_MAP[doc.category] || "bookmark",
-			title: doc.title || "Untitled",
-			url: doc.url || undefined,
-			author: doc.author || undefined,
-			description: doc.summary || undefined,
-			tags,
-			source: "readwise",
-			source_id: doc.id,
-			image_url: doc.image_url || undefined,
-			reading_progress: doc.reading_progress,
-			date_published: doc.published_date || undefined,
-			metadata: {
-				category: doc.category,
-				created_at: doc.created_at,
-			},
-		};
-
-		upsertResource(db, resource);
-		count++;
-	}
-
+	console.log(
+		`  Saved Readwise sync state (${count} docs, ${formatDuration(Date.now() - startedMs)})`,
+	);
 	return count;
 }
 
@@ -342,13 +517,17 @@ interface ZoteroItemData {
 	creators: ZoteroCreator[];
 	abstractNote: string;
 	dateAdded: string;
+	dateModified?: string;
 	date: string;
 	publicationTitle: string;
+	contentType?: string;
+	filename?: string;
 	tags: ZoteroTag[];
 }
 
 interface ZoteroItem {
 	key: string;
+	version?: number;
 	data: ZoteroItemData;
 }
 
@@ -370,23 +549,81 @@ const ZOTERO_TYPE_MAP: Record<string, ResourceType> = {
 	document: "pdf",
 };
 
+function formatZoteroCreatorName(creator: ZoteroCreator): string | null {
+	if (creator.name) return creator.name;
+	if (creator.firstName && creator.lastName) {
+		return `${creator.firstName} ${creator.lastName}`;
+	}
+	if (creator.lastName) return creator.lastName;
+	return null;
+}
+
 function formatZoteroCreators(creators: ZoteroCreator[]): string | undefined {
 	if (!creators || creators.length === 0) return undefined;
 
-	const names = creators
+	const authors = creators
 		.filter((c) => c.creatorType === "author")
-		.map((c) => {
-			if (c.name) return c.name;
-			if (c.firstName && c.lastName) return `${c.firstName} ${c.lastName}`;
-			if (c.lastName) return c.lastName;
-			return null;
-		})
+		.map(formatZoteroCreatorName)
 		.filter(Boolean);
+	const fallbackCreators = creators
+		.map(formatZoteroCreatorName)
+		.filter(Boolean);
+	const names = authors.length > 0 ? authors : fallbackCreators;
 
 	return names.length > 0 ? names.join(", ") : undefined;
 }
 
-async function syncZotero(db: ReturnType<typeof getDb>) {
+interface ZoteroSyncOptions {
+	full?: boolean;
+}
+
+function getZoteroResourceType(data: ZoteroItemData): ResourceType {
+	if (
+		data.itemType === "attachment" &&
+		data.contentType === "application/pdf"
+	) {
+		return "pdf";
+	}
+
+	return ZOTERO_TYPE_MAP[data.itemType] || "other";
+}
+
+function zoteroItemToResource(item: ZoteroItem, seenAt: string): Resource {
+	const data = item.data;
+	const itemUrl =
+		data.url ||
+		`https://www.zotero.org/users/${ZOTERO_USER_ID}/items/${item.key}`;
+
+	return {
+		id: `zot-${item.key}`,
+		type: getZoteroResourceType(data),
+		title: data.title || data.filename || "Untitled",
+		url: itemUrl,
+		author: formatZoteroCreators(data.creators),
+		description: data.abstractNote || undefined,
+		tags: data.tags?.map((t) => t.tag).filter(Boolean) || [],
+		source: "zotero",
+		source_id: item.key,
+		item_type: data.itemType,
+		publication_title: data.publicationTitle || undefined,
+		date_published: normalizeIsoDate(data.date),
+		source_created_at: normalizeIsoDate(data.dateAdded),
+		source_updated_at: normalizeIsoDate(data.dateModified),
+		last_seen_at: seenAt,
+		metadata: {
+			dateAdded: data.dateAdded,
+			dateModified: data.dateModified ?? null,
+			version: item.version ?? null,
+			contentType: data.contentType ?? null,
+			filename: data.filename ?? null,
+		},
+	};
+}
+
+async function syncZotero(
+	db: ReturnType<typeof getDb>,
+	options: ZoteroSyncOptions = {},
+) {
 	if (!ZOTERO_API_KEY || !ZOTERO_USER_ID) {
 		console.log(
 			"📄 ZOTERO_API_KEY or ZOTERO_USER_ID not set, skipping Zotero sync",
@@ -394,72 +631,86 @@ async function syncZotero(db: ReturnType<typeof getDb>) {
 		return 0;
 	}
 
+	const startedAt = nowIso();
+	const startedMs = Date.now();
+	const state = getSyncState(db, "zotero");
+	const sinceVersion = options.full ? undefined : state?.version;
+
 	console.log("📄 Fetching Zotero items...");
-	const items: ZoteroItem[] = [];
+	console.log(
+		sinceVersion
+			? `  Mode: incremental since library version ${sinceVersion}`
+			: "  Mode: full sync",
+	);
+
 	let start = 0;
 	const limit = 100;
+	let count = 0;
+	let latestVersion = sinceVersion;
 
 	while (true) {
-		const url = `https://api.zotero.org/users/${ZOTERO_USER_ID}/items/top?limit=${limit}&start=${start}&format=json`;
+		const url = new URL(
+			`https://api.zotero.org/users/${ZOTERO_USER_ID}/items/top`,
+		);
+		url.searchParams.set("limit", String(limit));
+		url.searchParams.set("start", String(start));
+		url.searchParams.set("format", "json");
+		if (sinceVersion) url.searchParams.set("since", String(sinceVersion));
 
-		const response = await fetchWithRetry(url, {
+		const response = await fetchWithRetry(url.toString(), {
 			headers: {
 				"Zotero-API-Key": ZOTERO_API_KEY,
 				"Zotero-API-Version": "3",
 			},
 		});
+		await requireOk(response, "Zotero");
 
-		if (!response.ok) {
-			throw new Error(
-				`Zotero API error: ${response.status} ${response.statusText}`,
-			);
-		}
-
-		const data: ZoteroItem[] = await response.json();
-		if (data.length === 0) break;
-
-		items.push(...data);
-		start += limit;
+		const headerVersion = Number.parseInt(
+			response.headers.get("Last-Modified-Version") || "",
+			10,
+		);
+		if (!Number.isNaN(headerVersion)) latestVersion = headerVersion;
 
 		const total = Number.parseInt(
 			response.headers.get("Total-Results") || "0",
 			10,
 		);
-		console.log(`  Fetched ${items.length}/${total} items...`);
+		const data: ZoteroItem[] = await response.json();
+		if (data.length === 0) {
+			console.log(
+				`  No Zotero changes (${formatDuration(Date.now() - startedMs)})`,
+			);
+			break;
+		}
+
+		const resources = data.map((item) => zoteroItemToResource(item, startedAt));
+		upsertResourceBatch(db, resources);
+
+		count += resources.length;
+		start += limit;
+		console.log(
+			`  Fetched ${count}/${total} items (version ${latestVersion ?? "unknown"}, ${formatDuration(Date.now() - startedMs)})`,
+		);
 
 		if (start >= total) break;
 		await delay(ZOTERO_DELAY_MS);
 	}
 
-	let count = 0;
-	for (const item of items) {
-		const data = item.data;
-		const itemUrl =
-			data.url ||
-			`https://www.zotero.org/users/${ZOTERO_USER_ID}/items/${item.key}`;
+	saveSyncState(db, {
+		source: "zotero",
+		last_started_at: startedAt,
+		last_success_at: nowIso(),
+		version: latestVersion,
+		metadata: {
+			count,
+			full: !sinceVersion,
+			durationMs: Date.now() - startedMs,
+		},
+	});
 
-		const resource: Resource = {
-			id: `zot-${item.key}`,
-			type: ZOTERO_TYPE_MAP[data.itemType] || "other",
-			title: data.title || "Untitled",
-			url: itemUrl,
-			author: formatZoteroCreators(data.creators),
-			description: data.abstractNote || undefined,
-			tags: data.tags?.map((t) => t.tag) || [],
-			source: "zotero",
-			source_id: item.key,
-			item_type: data.itemType,
-			publication_title: data.publicationTitle || undefined,
-			date_published: data.date || undefined,
-			metadata: {
-				dateAdded: data.dateAdded,
-			},
-		};
-
-		upsertResource(db, resource);
-		count++;
-	}
-
+	console.log(
+		`  Saved Zotero sync state (${count} items, ${formatDuration(Date.now() - startedMs)})`,
+	);
 	return count;
 }
 
@@ -958,6 +1209,79 @@ async function albumAddById(
 	);
 }
 
+// ============================================================================
+// Export helpers
+// ============================================================================
+
+function atomicWriteJson(path: string, data: unknown): void {
+	mkdirSync(dirname(path), { recursive: true });
+	const tempPath = `${path}.tmp`;
+	writeFileSync(tempPath, `${JSON.stringify(data, null, 2)}\n`);
+	renameSync(tempPath, path);
+}
+
+function exportLibrary(db: ReturnType<typeof getDb>): number {
+	const resources = getLibraryResources(db);
+
+	const frontendResources = resources.map((r) => ({
+		id: r.id,
+		source: r.source,
+		type: r.type,
+		title: r.title,
+		url: r.url || "",
+		author: r.author || null,
+		description: r.description || null,
+		dateAdded:
+			normalizeIsoDate(r.source_created_at) ||
+			normalizeIsoDate(r.created_at) ||
+			nowIso(),
+		datePublished: normalizeIsoDate(r.date_published) || null,
+		tags: r.tags || [],
+		imageUrl: r.image_url || null,
+		readingProgress: r.reading_progress,
+		itemType: r.item_type,
+		publicationTitle: r.publication_title,
+	}));
+
+	atomicWriteJson("./public/data/library.json", {
+		fetchedAt: nowIso(),
+		resources: frontendResources,
+	});
+	console.log(
+		`📚 Exported ${resources.length} library resources to ./public/data/library.json`,
+	);
+	return resources.length;
+}
+
+function exportNow(db: ReturnType<typeof getDb>): number {
+	const resources = getNowResources(db);
+
+	const frontendResources = resources.map((r) => ({
+		id: r.id,
+		source: r.source,
+		type: r.type,
+		title: r.title,
+		url: r.url || "",
+		author: r.author || null,
+		description: r.description || null,
+		imageUrl: r.image_url || null,
+		status: r.status,
+		queuePriority: r.queue_priority,
+		platformStatus: r.platform_status,
+		favorited: r.favorited === 1,
+		rating: r.rating || null,
+	}));
+
+	atomicWriteJson("./public/data/now.json", {
+		exportedAt: nowIso(),
+		resources: frontendResources,
+	});
+	console.log(
+		`🎯 Exported ${resources.length} now queue resources to ./public/data/now.json`,
+	);
+	return resources.length;
+}
+
 // CLI
 const { values, positionals } = parseArgs({
 	args: Bun.argv.slice(2),
@@ -967,6 +1291,8 @@ const { values, positionals } = parseArgs({
 		stats: { type: "boolean", short: "s" },
 		"export-library": { type: "boolean" },
 		"export-now": { type: "boolean" },
+		full: { type: "boolean" },
+		since: { type: "string" },
 	},
 	allowPositionals: true,
 });
@@ -1002,15 +1328,20 @@ Options:
   -e, --export TYPE     Export resources as JSON to stdout (book|track|movie|game|article|paper|all)
   --export-library      Export library (readwise+zotero) to public/data/library.json
   --export-now          Export now queue to public/data/now.json
+  --full                Ignore saved sync state and fetch all Readwise/Zotero records
+  --since ISO_DATE      Override Readwise incremental start timestamp
   -h, --help            Show this help
 
 Examples:
-  bun sync local              # fast, no API calls
-  bun sync api                # slow, hits Readwise + Zotero + Letterboxd + RAWG APIs
-  bun sync readwise           # just Readwise
-  bun sync letterboxd         # just Letterboxd
-  bun sync --stats            # show what's in the DB
-  bun sync --export-library   # regenerate library.json for Astro build
+  bun sync local                         # fast, no API calls
+  bun sync api --export-library          # sync APIs, then regenerate library.json
+  bun sync readwise                      # incremental Readwise sync after first successful run
+  bun sync readwise --full               # full Readwise backfill
+  bun sync readwise --since 2026-04-01   # Readwise changes since a timestamp/date
+  bun sync zotero                        # incremental Zotero sync after first successful run
+  bun sync letterboxd                    # just Letterboxd
+  bun sync --stats                       # show what's in the DB
+  bun sync --export-library              # export only, no sync
 `);
 }
 
@@ -1021,6 +1352,8 @@ async function main() {
 	}
 
 	const db = getDb();
+	const hasCommand = positionals.length > 0;
+	const command = positionals[0] || "all";
 
 	if (values.stats) {
 		console.log("📊 Database stats:");
@@ -1037,79 +1370,22 @@ async function main() {
 		return;
 	}
 
-	if (values["export-library"]) {
-		const resources = getLibraryResources(db);
-
-		// Transform to frontend format (snake_case → camelCase)
-		const frontendResources = resources.map((r) => ({
-			id: r.id,
-			source: r.source,
-			type: r.type,
-			title: r.title,
-			url: r.url || "",
-			author: r.author || null,
-			description: r.description || null,
-			dateAdded: r.created_at || new Date().toISOString(),
-			datePublished: r.date_published || null,
-			tags: r.tags || [],
-			imageUrl: r.image_url || null,
-			readingProgress: r.reading_progress,
-			itemType: r.item_type,
-			publicationTitle: r.publication_title,
-		}));
-
-		const output = {
-			fetchedAt: new Date().toISOString(),
-			resources: frontendResources,
-		};
-
-		const outputPath = "./public/data/library.json";
-		writeFileSync(outputPath, JSON.stringify(output, null, 2));
-		console.log(
-			`📚 Exported ${resources.length} library resources to ${outputPath}`,
-		);
+	if (values["export-library"] && !hasCommand) {
+		exportLibrary(db);
 		db.close();
 		return;
 	}
 
-	if (values["export-now"]) {
-		const resources = getNowResources(db);
-
-		// Transform to frontend format
-		const frontendResources = resources.map((r) => ({
-			id: r.id,
-			source: r.source,
-			type: r.type,
-			title: r.title,
-			url: r.url || "",
-			author: r.author || null,
-			description: r.description || null,
-			imageUrl: r.image_url || null,
-			status: r.status,
-			queuePriority: r.queue_priority,
-			platformStatus: r.platform_status,
-			favorited: r.favorited === 1,
-			rating: r.rating || null,
-		}));
-
-		const output = {
-			exportedAt: new Date().toISOString(),
-			resources: frontendResources,
-		};
-
-		const outputPath = "./public/data/now.json";
-		writeFileSync(outputPath, JSON.stringify(output, null, 2));
-		console.log(
-			`🎯 Exported ${resources.length} now queue resources to ${outputPath}`,
-		);
+	if (values["export-now"] && !hasCommand) {
+		exportNow(db);
 		db.close();
 		return;
 	}
-
-	const command = positionals[0] || "all";
 
 	console.log("🔄 Starting sync...\n");
 
+	const fullSync = values.full === true;
+	const since = typeof values.since === "string" ? values.since : undefined;
 	let total = 0;
 
 	switch (command) {
@@ -1123,10 +1399,10 @@ async function main() {
 			break;
 		}
 		case "api": {
-			const rwCount = await syncReadwise(db);
+			const rwCount = await syncReadwise(db, { full: fullSync, since });
 			console.log(`✅ Readwise: ${rwCount} synced`);
 			total += rwCount;
-			const zotCount = await syncZotero(db);
+			const zotCount = await syncZotero(db, { full: fullSync });
 			console.log(`✅ Zotero: ${zotCount} synced`);
 			total += zotCount;
 			const lbCount = await syncLetterboxd(db);
@@ -1144,10 +1420,10 @@ async function main() {
 			const musicCount = await syncMusic(db);
 			console.log(`✅ Music: ${musicCount} synced`);
 			total += musicCount;
-			const rwCount = await syncReadwise(db);
+			const rwCount = await syncReadwise(db, { full: fullSync, since });
 			console.log(`✅ Readwise: ${rwCount} synced`);
 			total += rwCount;
-			const zotCount = await syncZotero(db);
+			const zotCount = await syncZotero(db, { full: fullSync });
 			console.log(`✅ Zotero: ${zotCount} synced`);
 			total += zotCount;
 			const lbCount = await syncLetterboxd(db);
@@ -1169,12 +1445,12 @@ async function main() {
 			break;
 		}
 		case "readwise": {
-			total = await syncReadwise(db);
+			total = await syncReadwise(db, { full: fullSync, since });
 			console.log(`✅ Readwise: ${total} synced`);
 			break;
 		}
 		case "zotero": {
-			total = await syncZotero(db);
+			total = await syncZotero(db, { full: fullSync });
 			console.log(`✅ Zotero: ${total} synced`);
 			break;
 		}
@@ -1243,8 +1519,19 @@ async function main() {
 			printHelp();
 	}
 
+	if (values["export-library"]) {
+		exportLibrary(db);
+	}
+	if (values["export-now"]) {
+		exportNow(db);
+	}
+
 	console.log(`\n📊 Total: ${total} resources synced`);
 	db.close();
 }
 
-main();
+main().catch((error) => {
+	const message = error instanceof Error ? error.message : String(error);
+	console.error(`\n❌ Sync failed: ${message}`);
+	process.exitCode = 1;
+});
