@@ -143,7 +143,12 @@ async function syncBooks(db: ReturnType<typeof getDb>) {
 			: undefined;
 
 		const resource: Resource = {
-			id: `goodreads-${bookId || Buffer.from(title + author).toString("base64url").slice(0, 16)}`,
+			id: `goodreads-${
+				bookId ||
+				Buffer.from(title + author)
+					.toString("base64url")
+					.slice(0, 16)
+			}`,
 			type: "book",
 			title,
 			author,
@@ -159,7 +164,7 @@ async function syncBooks(db: ReturnType<typeof getDb>) {
 			status,
 			image_url: imageUrl,
 			metadata: {
-				rating: Number.parseInt(rating) || 0,
+				rating: Number.parseInt(rating, 10) || 0,
 				dateRead: dateRead || null,
 				isbn: coverIsbn || null,
 			},
@@ -692,7 +697,9 @@ async function tmdbSearch(query: string): Promise<TmdbMovie[]> {
 	const response = await fetch(url);
 
 	if (!response.ok) {
-		throw new Error(`TMDB API error: ${response.status} ${response.statusText}`);
+		throw new Error(
+			`TMDB API error: ${response.status} ${response.statusText}`,
+		);
 	}
 
 	const data: TmdbSearchResponse = await response.json();
@@ -710,13 +717,18 @@ async function tmdbGetMovie(id: number): Promise<TmdbMovie | null> {
 
 	if (!response.ok) {
 		if (response.status === 404) return null;
-		throw new Error(`TMDB API error: ${response.status} ${response.statusText}`);
+		throw new Error(
+			`TMDB API error: ${response.status} ${response.statusText}`,
+		);
 	}
 
 	return response.json();
 }
 
-function tmdbMovieToResource(movie: TmdbMovie, status: "now" | "next" = "next"): Resource {
+function tmdbMovieToResource(
+	movie: TmdbMovie,
+	status: "now" | "next" = "next",
+): Resource {
 	const posterUrl = movie.poster_path
 		? `https://image.tmdb.org/t/p/w200${movie.poster_path}`
 		: undefined;
@@ -740,7 +752,11 @@ function tmdbMovieToResource(movie: TmdbMovie, status: "now" | "next" = "next"):
 	};
 }
 
-async function tmdbSearchAndAdd(db: ReturnType<typeof getDb>, query: string, status: "now" | "next" = "next") {
+async function tmdbSearchAndAdd(
+	_db: ReturnType<typeof getDb>,
+	query: string,
+	_status: "now" | "next" = "next",
+) {
 	console.log(`🔍 Searching TMDB for "${query}"...`);
 	const results = await tmdbSearch(query);
 
@@ -760,7 +776,11 @@ async function tmdbSearchAndAdd(db: ReturnType<typeof getDb>, query: string, sta
 	console.log(`  Example: bun sync tmdb add ${results[0].id}`);
 }
 
-async function tmdbAddById(db: ReturnType<typeof getDb>, id: number, status: "now" | "next" = "next") {
+async function tmdbAddById(
+	db: ReturnType<typeof getDb>,
+	id: number,
+	status: "now" | "next" = "next",
+) {
 	console.log(`🎬 Fetching movie ${id} from TMDB...`);
 	const movie = await tmdbGetMovie(id);
 
@@ -773,7 +793,9 @@ async function tmdbAddById(db: ReturnType<typeof getDb>, id: number, status: "no
 	upsertResource(db, resource);
 
 	const year = movie.release_date?.split("-")[0] || "????";
-	console.log(`✅ Added "${movie.title}" (${year}) to queue with status: ${status}`);
+	console.log(
+		`✅ Added "${movie.title}" (${year}) to queue with status: ${status}`,
+	);
 }
 
 // ============================================================================
@@ -816,7 +838,9 @@ async function getSpotifyToken(): Promise<string | null> {
 	});
 
 	if (!response.ok) {
-		throw new Error(`Spotify auth error: ${response.status} ${response.statusText}`);
+		throw new Error(
+			`Spotify auth error: ${response.status} ${response.statusText}`,
+		);
 	}
 
 	const data = await response.json();
@@ -834,7 +858,9 @@ async function spotifySearchAlbums(query: string): Promise<SpotifyAlbum[]> {
 	});
 
 	if (!response.ok) {
-		throw new Error(`Spotify API error: ${response.status} ${response.statusText}`);
+		throw new Error(
+			`Spotify API error: ${response.status} ${response.statusText}`,
+		);
 	}
 
 	const data: SpotifySearchResponse = await response.json();
@@ -852,16 +878,22 @@ async function spotifyGetAlbum(id: string): Promise<SpotifyAlbum | null> {
 
 	if (!response.ok) {
 		if (response.status === 404) return null;
-		throw new Error(`Spotify API error: ${response.status} ${response.statusText}`);
+		throw new Error(
+			`Spotify API error: ${response.status} ${response.statusText}`,
+		);
 	}
 
 	return response.json();
 }
 
-function spotifyAlbumToResource(album: SpotifyAlbum, status: "now" | "next" = "next"): Resource {
-	const imageUrl = album.images.find((img) => img.width === 300)?.url 
-		|| album.images[0]?.url 
-		|| undefined;
+function spotifyAlbumToResource(
+	album: SpotifyAlbum,
+	status: "now" | "next" = "next",
+): Resource {
+	const imageUrl =
+		album.images.find((img) => img.width === 300)?.url ||
+		album.images[0]?.url ||
+		undefined;
 
 	return {
 		id: `spotify-album-${album.id}`,
@@ -882,7 +914,7 @@ function spotifyAlbumToResource(album: SpotifyAlbum, status: "now" | "next" = "n
 	};
 }
 
-async function albumSearch(db: ReturnType<typeof getDb>, query: string) {
+async function albumSearch(_db: ReturnType<typeof getDb>, query: string) {
 	console.log(`🔍 Searching Spotify for "${query}"...`);
 	const results = await spotifySearchAlbums(query);
 
@@ -903,7 +935,11 @@ async function albumSearch(db: ReturnType<typeof getDb>, query: string) {
 	console.log(`  Example: bun sync album add ${results[0].id}`);
 }
 
-async function albumAddById(db: ReturnType<typeof getDb>, id: string, status: "now" | "next" = "next") {
+async function albumAddById(
+	db: ReturnType<typeof getDb>,
+	id: string,
+	status: "now" | "next" = "next",
+) {
 	console.log(`🎵 Fetching album ${id} from Spotify...`);
 	const album = await spotifyGetAlbum(id);
 
@@ -917,7 +953,9 @@ async function albumAddById(db: ReturnType<typeof getDb>, id: string, status: "n
 
 	const year = album.release_date?.split("-")[0] || "????";
 	const artists = album.artists.map((a) => a.name).join(", ");
-	console.log(`✅ Added "${album.name}" by ${artists} (${year}) to queue with status: ${status}`);
+	console.log(
+		`✅ Added "${album.name}" by ${artists} (${year}) to queue with status: ${status}`,
+	);
 }
 
 // CLI
@@ -1155,7 +1193,7 @@ async function main() {
 			if (subcommand === "search") {
 				const query = positionals.slice(2).join(" ");
 				if (!query) {
-					console.log("Usage: bun sync tmdb search \"movie title\"");
+					console.log('Usage: bun sync tmdb search "movie title"');
 					break;
 				}
 				await tmdbSearchAndAdd(db, query);
@@ -1180,7 +1218,7 @@ async function main() {
 			if (subcommand === "search") {
 				const query = positionals.slice(2).join(" ");
 				if (!query) {
-					console.log("Usage: bun sync album search \"album name\"");
+					console.log('Usage: bun sync album search "album name"');
 					break;
 				}
 				await albumSearch(db, query);

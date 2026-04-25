@@ -6,7 +6,14 @@
 	},
 	"files": {
 		"ignoreUnknown": false,
-		"includes": ["**", "!.astro", "!.vscode", "!dist"]
+		"includes": [
+			"**",
+			"!.astro",
+			"!.vscode",
+			"!.claude",
+			"!dist",
+			"!public/data/*.json"
+		]
 	},
 	"formatter": {
 		"enabled": true,

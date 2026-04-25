@@ -1,9 +1,7 @@
 ---
 title: How videogames shaped me 🎮 (wip)
 description: "An exploration of how videogames and computers have guided my life."
-image:
-    url: "https://docs.astro.build/default-og-image.png"
-    alt: "The word astro against an illustration of planets and stars."
+image: "https://docs.astro.build/default-og-image.png"
 pubDate: "2022-08-08"
 tags: ["gaming", "computers", "programming"]
 ---

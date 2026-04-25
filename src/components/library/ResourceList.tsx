@@ -45,6 +45,7 @@ export default function ResourceList({ resources, pageSize = 50 }: Props) {
 			{totalPages > 1 && (
 				<div class="flex items-center justify-center gap-4 mt-4">
 					<button
+						type="button"
 						onClick={() => setPage((p) => Math.max(0, p - 1))}
 						disabled={page === 0}
 						class="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
@@ -55,6 +56,7 @@ export default function ResourceList({ resources, pageSize = 50 }: Props) {
 						Page {page + 1} of {totalPages}
 					</span>
 					<button
+						type="button"
 						onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
 						disabled={page >= totalPages - 1}
 						class="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"

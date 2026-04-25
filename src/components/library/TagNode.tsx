@@ -33,6 +33,7 @@ export default function TagNode({
 				{/* Expand/Collapse indicator */}
 				{hasChildren ? (
 					<button
+						type="button"
 						onClick={(e) => {
 							e.stopPropagation();
 							onToggleExpand(node.key);
@@ -47,6 +48,7 @@ export default function TagNode({
 
 				{/* Tag name and count */}
 				<button
+					type="button"
 					onClick={() => onSelect(node.key)}
 					class="flex-1 text-left text-sm truncate"
 				>

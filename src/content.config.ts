@@ -1,6 +1,7 @@
-// 1. Import utilities from `astro:content`
-import { defineCollection, z } from "astro:content";
+// 1. Import utilities from Astro
+import { defineCollection } from "astro:content";
 import { glob } from "astro/loaders";
+import { z } from "astro/zod";
 
 // define general schema with zod validation
 const blogSchema = z.object({
@@ -11,13 +12,15 @@ const blogSchema = z.object({
 });
 
 // define collections with shared schema
+const contentPattern = ["**/[^_]*.md", "!**/*backup*.md", "!**/*Backup*.md"];
+
 const waves = defineCollection({
-	loader: glob({ pattern: "**/[^_]*.md", base: "./src/content/waves" }),
+	loader: glob({ pattern: contentPattern, base: "./src/content/waves" }),
 	schema: blogSchema,
 });
 
 const depths = defineCollection({
-	loader: glob({ pattern: "**/[^_]*.md", base: "./src/content/depths" }),
+	loader: glob({ pattern: contentPattern, base: "./src/content/depths" }),
 	schema: blogSchema,
 });
 
