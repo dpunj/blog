@@ -165,6 +165,7 @@ export default function MusicExplorer({ tracks }: Props) {
 					</p>
 				</div>
 				<button
+					type="button"
 					onClick={() => setShowStats(!showStats)}
 					class="text-sm px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
 				>
@@ -226,6 +227,7 @@ export default function MusicExplorer({ tracks }: Props) {
 				/>
 				{search && (
 					<button
+						type="button"
 						onClick={() => handleSearchChange("")}
 						class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
 					>
@@ -239,6 +241,7 @@ export default function MusicExplorer({ tracks }: Props) {
 				<span class="text-sm text-gray-500 dark:text-gray-400">Decades:</span>
 				{decades.map((decade) => (
 					<button
+						type="button"
 						key={decade}
 						onClick={() => toggleDecade(decade)}
 						class={`text-xs px-2 py-1 rounded-full border transition-colors ${
@@ -254,6 +257,7 @@ export default function MusicExplorer({ tracks }: Props) {
 
 			{hasActiveFilters && (
 				<button
+					type="button"
 					onClick={clearFilters}
 					class="text-xs text-red-500 hover:text-red-400"
 				>
@@ -272,6 +276,7 @@ export default function MusicExplorer({ tracks }: Props) {
 					<span class="text-xs text-gray-500">Sort:</span>
 					{(["name", "artist", "year", "duration"] as SortBy[]).map((s) => (
 						<button
+							type="button"
 							key={s}
 							onClick={() => handleSort(s)}
 							class={`text-xs px-2 py-1 rounded ${
@@ -291,6 +296,7 @@ export default function MusicExplorer({ tracks }: Props) {
 			<div class="space-y-1">
 				<div class="flex items-center gap-2 mb-2">
 					<button
+						type="button"
 						onClick={selectAllVisible}
 						class="text-xs text-blue-500 hover:text-blue-400"
 					>
@@ -298,6 +304,7 @@ export default function MusicExplorer({ tracks }: Props) {
 					</button>
 					{selectedIds.size > 0 && (
 						<button
+							type="button"
 							onClick={clearSelection}
 							class="text-xs text-red-500 hover:text-red-400"
 						>
@@ -358,6 +365,7 @@ export default function MusicExplorer({ tracks }: Props) {
 			{totalPages > 1 && (
 				<div class="flex items-center justify-center gap-4">
 					<button
+						type="button"
 						onClick={() => setPage((p) => Math.max(0, p - 1))}
 						disabled={page === 0}
 						class="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -368,6 +376,7 @@ export default function MusicExplorer({ tracks }: Props) {
 						Page {page + 1} of {totalPages}
 					</span>
 					<button
+						type="button"
 						onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
 						disabled={page >= totalPages - 1}
 						class="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800"
@@ -389,6 +398,7 @@ export default function MusicExplorer({ tracks }: Props) {
 						</div>
 						<div class="flex flex-wrap gap-2">
 							<button
+								type="button"
 								onClick={() =>
 									copyToClipboard(exportAsJson(selectedTracks), "JSON")
 								}
@@ -401,6 +411,7 @@ export default function MusicExplorer({ tracks }: Props) {
 								{copySuccess === "JSON" ? "Copied!" : "Copy JSON"}
 							</button>
 							<button
+								type="button"
 								onClick={() =>
 									copyToClipboard(exportAsText(selectedTracks), "Text")
 								}
@@ -413,6 +424,7 @@ export default function MusicExplorer({ tracks }: Props) {
 								{copySuccess === "Text" ? "Copied!" : "Copy Names"}
 							</button>
 							<button
+								type="button"
 								onClick={() =>
 									copyToClipboard(exportAsSpotifyUris(selectedTracks), "URIs")
 								}
@@ -425,6 +437,7 @@ export default function MusicExplorer({ tracks }: Props) {
 								{copySuccess === "URIs" ? "Copied!" : "Copy Spotify URIs"}
 							</button>
 							<button
+								type="button"
 								onClick={clearSelection}
 								class="text-xs px-3 py-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500/10"
 							>

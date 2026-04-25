@@ -20,6 +20,7 @@ export default function LibrarySearch({
 			/>
 			{value && (
 				<button
+					type="button"
 					onClick={() => onChange("")}
 					class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 text-lg leading-none"
 					title="Clear search"

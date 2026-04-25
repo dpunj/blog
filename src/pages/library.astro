@@ -1,6 +1,6 @@
 ---
+import { existsSync, readFileSync } from "node:fs";
 import LibraryExplorer from "../components/library/LibraryExplorer";
-import tagHierarchyConfig from "../data/tag-hierarchy.json";
 import BaseLayout from "../layouts/BaseLayout.astro";
 import type { LibraryData, TagHierarchyConfig } from "../lib/library";
 import { buildTagHierarchy } from "../lib/library";
@@ -8,17 +8,24 @@ import { buildTagHierarchy } from "../lib/library";
 const pageTitle = "Library";
 const pageDescription = "My digital garden of bookmarks, articles, and papers";
 
-// Load library data (exported from SQLite via `bun sync --export-library`)
-const libraryModule = await import("../../public/data/library.json");
-const libraryData = libraryModule.default as LibraryData;
+function readJsonFile<T>(url: URL, fallback: T): T {
+	if (!existsSync(url)) return fallback;
+	return JSON.parse(readFileSync(url, "utf-8")) as T;
+}
+
+// Load library data (exported from SQLite via `bun sync --export-library`).
+// Fall back to an empty library so builds still pass before the first export.
+const libraryData = readJsonFile<LibraryData>(
+	new URL("../../public/data/library.json", import.meta.url),
+	{ fetchedAt: new Date().toISOString(), resources: [] },
+);
+const tagHierarchyConfig = readJsonFile<TagHierarchyConfig>(
+	new URL("../data/tag-hierarchy.json", import.meta.url),
+	{ hierarchy: {} },
+);
 const resources = libraryData.resources;
 const fetchedAt = libraryData.fetchedAt;
-
-// Build tag hierarchy
-const hierarchy = buildTagHierarchy(
-	tagHierarchyConfig as TagHierarchyConfig,
-	resources,
-);
+const hierarchy = buildTagHierarchy(tagHierarchyConfig, resources);
 ---
 
 <BaseLayout pageTitle={pageTitle}>

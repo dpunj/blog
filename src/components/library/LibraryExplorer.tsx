@@ -136,6 +136,7 @@ export default function LibraryExplorer({
 							</span>
 							{(["all", "readwise", "zotero"] as const).map((source) => (
 								<button
+									type="button"
 									key={source}
 									onClick={() => setSourceFilter(source)}
 									class={`text-xs px-2 py-1 rounded transition-colors ${
@@ -183,6 +184,7 @@ export default function LibraryExplorer({
 							</span>
 							{(["dateAdded", "title"] as SortBy[]).map((s) => (
 								<button
+									type="button"
 									key={s}
 									onClick={() => handleSort(s)}
 									class={`text-xs px-2 py-1 rounded transition-colors ${
@@ -207,6 +209,7 @@ export default function LibraryExplorer({
 									` (filtered from ${resources.length.toLocaleString()})`}
 							</span>
 							<button
+								type="button"
 								onClick={clearAllFilters}
 								class="text-xs text-red-500 hover:text-red-400"
 							>

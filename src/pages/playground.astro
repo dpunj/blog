@@ -1,0 +1,33 @@
+---
+import Footer from '../components/Footer.astro';
+import Header from '../components/Header.astro';
+import ScrollShowcase from '../components/ScrollShowcase.tsx';
+import '../styles/global.css';
+---
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <meta name="viewport" content="width=device-width" />
+    <title>Scroll Playground ✨</title>
+    <script is:inline>
+      const theme = localStorage.getItem('theme') ??
+        (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      if (theme === 'dark') document.documentElement.classList.add('dark');
+    </script>
+  </head>
+  <body>
+    <div class="max-w-3xl mx-auto px-8">
+      <Header />
+    </div>
+    <main>
+      <ScrollShowcase client:load />
+    </main>
+    <div class="max-w-3xl mx-auto px-8">
+      <Footer />
+    </div>
+    <script>
+      import "../lib/menu.js";
+    </script>
+  </body>
+</html>

@@ -1,29 +1,30 @@
 ---
 // src/components/Books.astro
-import type { SortBy } from '../lib/books';
-import { filterBooks, parseBooks, sortBooks } from '../lib/books';
+import csvText from "../../public/data/goodreads_library_export.csv?raw";
+import type { ShelfFilter, SortBy } from "../lib/books";
+import { filterByShelf, parseGoodreadsData, sortBooks } from "../lib/books";
 
 export interface Props {
-  limit?: number;
-  sortBy?: SortBy;
-  shelf?: string;
+	limit?: number;
+	sortBy?: SortBy;
+	shelf?: ShelfFilter;
 }
 
-const { limit, sortBy = 'date', shelf } = Astro.props;
+const { limit, sortBy = "dateRead", shelf = "all" } = Astro.props;
 
 // Fetch and process books
-const allBooks = await parseBooks();
-const filteredBooks = filterBooks(allBooks, shelf);
-const sortedBooks = sortBooks(filteredBooks, sortBy);
+const allBooks = parseGoodreadsData(csvText);
+const filteredBooks = filterByShelf(allBooks, shelf);
+const sortedBooks = sortBooks(filteredBooks, sortBy, "desc");
 const books = limit ? sortedBooks.slice(0, limit) : sortedBooks;
 
-function formatDate(date: Date | null): string {
-  if (!date) return 'Not read';
-  return date.toLocaleDateString('en-US', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric'
-  });
+function formatDate(date: string | null): string {
+	if (!date) return "Not read";
+	return new Date(date).toLocaleDateString("en-US", {
+		year: "numeric",
+		month: "long",
+		day: "numeric",
+	});
 }
 ---
 
@@ -39,10 +40,10 @@ function formatDate(date: Date | null): string {
           by {book.author}
         </p>
         
-        {book.rating > 0 && (
+        {book.myRating > 0 && (
           <div class="flex items-center mb-3">
             {Array.from({ length: 5 }).map((_, i) => (
-              <span class={`text-lg ${i < book.rating ? "text-yellow-400" : "text-gray-300"}`}>
+              <span class={`text-lg ${i < book.myRating ? "text-yellow-400" : "text-gray-300"}`}>
                 ★
               </span>
             ))}

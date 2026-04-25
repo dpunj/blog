@@ -1,4 +1,5 @@
 ---
+import { existsSync, readFileSync } from "node:fs";
 import BaseLayout from "../layouts/BaseLayout.astro";
 
 // Load now queue data at build time
@@ -23,23 +24,9 @@ interface NowResource {
 	rating: number | null;
 }
 
-try {
-	const response = await fetch(new URL("/data/now.json", import.meta.url));
-	if (response.ok) {
-		nowData = await response.json();
-	}
-} catch {
-	// File doesn't exist yet or fetch failed, use empty data
-}
-
-// In dev/build, try direct import as fallback
-if (nowData.resources.length === 0) {
-	try {
-		const file = await import("../../public/data/now.json");
-		nowData = file.default as typeof nowData;
-	} catch {
-		// Ignore
-	}
+const nowJsonUrl = new URL("../../public/data/now.json", import.meta.url);
+if (existsSync(nowJsonUrl)) {
+	nowData = JSON.parse(readFileSync(nowJsonUrl, "utf-8")) as typeof nowData;
 }
 
 const { resources } = nowData;
