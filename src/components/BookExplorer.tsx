@@ -26,23 +26,36 @@ interface Props {
 const PAGE_SIZE = 25;
 
 const SHELF_COLORS: Record<string, string> = {
-	read: "bg-green-500/20 text-green-400 border-green-500/30",
-	"currently-reading": "bg-blue-500/20 text-blue-400 border-blue-500/30",
-	"to-read": "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
+	read: "bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"currently-reading":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"to-read":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
 };
 
 const DECADE_COLORS: Record<string, string> = {
-	"1890s": "bg-stone-500/20 text-stone-400 border-stone-500/30",
-	"1930s": "bg-amber-500/20 text-amber-400 border-amber-500/30",
-	"1940s": "bg-orange-500/20 text-orange-400 border-orange-500/30",
-	"1950s": "bg-red-500/20 text-red-400 border-red-500/30",
-	"1960s": "bg-rose-500/20 text-rose-400 border-rose-500/30",
-	"1970s": "bg-pink-500/20 text-pink-400 border-pink-500/30",
-	"1980s": "bg-fuchsia-500/20 text-fuchsia-400 border-fuchsia-500/30",
-	"1990s": "bg-purple-500/20 text-purple-400 border-purple-500/30",
-	"2000s": "bg-violet-500/20 text-violet-400 border-violet-500/30",
-	"2010s": "bg-indigo-500/20 text-indigo-400 border-indigo-500/30",
-	"2020s": "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+	"1890s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"1930s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"1940s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"1950s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"1960s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"1970s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"1980s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"1990s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"2000s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"2010s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
+	"2020s":
+		"bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10",
 };
 
 function StarRating({
@@ -54,11 +67,12 @@ function StarRating({
 }) {
 	const sizeClass = size === "sm" ? "text-xs" : "text-sm";
 	return (
-		<span class={`${sizeClass} tracking-tight`}>
+		<span class={sizeClass} role="img" aria-label={`${rating} out of 5 stars`}>
 			{[1, 2, 3, 4, 5].map((star) => (
 				<span
 					key={star}
 					class={star <= rating ? "text-yellow-400" : "text-gray-400"}
+					aria-hidden="true"
 				>
 					{star <= rating ? "★" : "☆"}
 				</span>
@@ -208,15 +222,11 @@ export default function BookExplorer({ books }: Props) {
 		selectedRecommender;
 
 	return (
-		<div class="space-y-6">
+		<div class="space-y-5">
 			{/* Header Stats */}
-			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+			<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 				<div>
-					<p class="text-sm text-gray-500 dark:text-gray-400">
-						{stats.booksRead} read, {stats.currentlyReading} reading,{" "}
-						{stats.booksToRead} to read
-					</p>
-					<p class="text-xs text-gray-400 dark:text-gray-500">
+					<p class="text-pretty text-sm text-blue-900/70 dark:text-blue-100/65">
 						{stats.totalPagesRead.toLocaleString()} pages from{" "}
 						{stats.uniqueAuthors} authors
 					</p>
@@ -224,15 +234,15 @@ export default function BookExplorer({ books }: Props) {
 				<button
 					type="button"
 					onClick={() => setShowStats(!showStats)}
-					class="text-sm px-3 py-1 rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+					class="w-fit rounded-md border border-blue-900/10 px-3 py-1 text-sm transition-colors hover:bg-white/25 dark:border-blue-100/10 dark:hover:bg-blue-950/20"
 				>
-					{showStats ? "Hide Stats" : "Show Stats"}
+					{showStats ? "Hide details" : "Details"}
 				</button>
 			</div>
 
 			{/* Stats Panel */}
 			{showStats && (
-				<div class="p-4 rounded-lg bg-gray-100 dark:bg-gray-800 space-y-4">
+				<div class="space-y-4 rounded-2xl border border-blue-900/10 bg-white/25 p-4 dark:border-blue-100/10 dark:bg-blue-950/15">
 					{/* Rating Distribution */}
 					<div>
 						<h3 class="font-semibold text-lg mb-2">My Ratings</h3>
@@ -332,13 +342,14 @@ export default function BookExplorer({ books }: Props) {
 						handleSearchChange((e.target as HTMLInputElement).value)
 					}
 					placeholder="Search books or authors..."
-					class="w-full px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-500"
+					class="w-full rounded-xl border border-blue-900/10 bg-white/25 px-4 py-2 placeholder:text-blue-900/40 focus:outline-none focus:ring-2 focus:ring-blue-500/40 dark:border-blue-100/10 dark:bg-blue-950/15 dark:placeholder:text-blue-100/35"
 				/>
 				{search && (
 					<button
 						type="button"
 						onClick={() => handleSearchChange("")}
-						class="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+						class="absolute right-3 top-1/2 -translate-y-1/2 text-blue-900/45 hover:text-blue-900 dark:text-blue-100/45 dark:hover:text-blue-100"
+						aria-label="Clear search"
 					>
 						&times;
 					</button>
@@ -347,7 +358,9 @@ export default function BookExplorer({ books }: Props) {
 
 			{/* Shelf Filters */}
 			<div class="flex flex-wrap items-center gap-2">
-				<span class="text-sm text-gray-500 dark:text-gray-400">Shelf:</span>
+				<span class="text-sm text-blue-900/60 dark:text-blue-100/55">
+					Shelf:
+				</span>
 				{(["all", "read", "currently-reading", "to-read"] as ShelfFilter[]).map(
 					(shelf) => (
 						<button
@@ -360,9 +373,9 @@ export default function BookExplorer({ books }: Props) {
 							class={`text-xs px-2 py-1 rounded-full border transition-colors ${
 								shelfFilter === shelf
 									? shelf === "all"
-										? "bg-gray-500/20 text-gray-400 border-gray-500/30"
+										? "bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10"
 										: SHELF_COLORS[shelf]
-									: "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+									: "border-blue-900/10 hover:bg-white/25 dark:border-blue-100/10 dark:hover:bg-blue-950/20"
 							}`}
 						>
 							{shelf === "all"
@@ -377,7 +390,9 @@ export default function BookExplorer({ books }: Props) {
 
 			{/* Decade Filters */}
 			<div class="flex flex-wrap items-center gap-2">
-				<span class="text-sm text-gray-500 dark:text-gray-400">Decades:</span>
+				<span class="text-sm text-blue-900/60 dark:text-blue-100/55">
+					Decades:
+				</span>
 				{decades.map((decade) => (
 					<button
 						type="button"
@@ -385,8 +400,8 @@ export default function BookExplorer({ books }: Props) {
 						onClick={() => toggleDecade(decade)}
 						class={`text-xs px-2 py-1 rounded-full border transition-colors ${
 							selectedDecades.includes(decade)
-								? DECADE_COLORS[decade] || "bg-gray-500/20 text-gray-400"
-								: "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+								? DECADE_COLORS[decade] || "bg-blue-500/10 text-blue-900"
+								: "border-blue-900/10 hover:bg-white/25 dark:border-blue-100/10 dark:hover:bg-blue-950/20"
 						}`}
 					>
 						{decade}
@@ -397,7 +412,9 @@ export default function BookExplorer({ books }: Props) {
 			{/* Recommender Filter */}
 			{recommenders.length > 0 && (
 				<div class="flex flex-wrap items-center gap-2">
-					<span class="text-sm text-gray-500 dark:text-gray-400">From:</span>
+					<span class="text-sm text-blue-900/60 dark:text-blue-100/55">
+						From:
+					</span>
 					{recommenders.map((rec) => (
 						<button
 							type="button"
@@ -410,8 +427,8 @@ export default function BookExplorer({ books }: Props) {
 							}}
 							class={`text-xs px-2 py-1 rounded-full border transition-colors ${
 								selectedRecommender === rec
-									? "bg-purple-500/20 text-purple-400 border-purple-500/30"
-									: "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+									? "bg-blue-500/10 text-blue-900 border-blue-900/10 dark:text-blue-100 dark:border-blue-100/10"
+									: "border-blue-900/10 hover:bg-white/25 dark:border-blue-100/10 dark:hover:bg-blue-950/20"
 							}`}
 						>
 							{rec}
@@ -432,13 +449,15 @@ export default function BookExplorer({ books }: Props) {
 
 			{/* Results and Sort */}
 			<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-				<p class="text-sm text-gray-600 dark:text-gray-400">
+				<p class="text-sm text-blue-900/70 dark:text-blue-100/65">
 					{filteredBooks.length.toLocaleString()} books
 					{hasActiveFilters &&
 						` (filtered from ${books.length.toLocaleString()})`}
 				</p>
 				<div class="flex items-center gap-2 flex-wrap">
-					<span class="text-xs text-gray-500">Sort:</span>
+					<span class="text-xs text-blue-900/55 dark:text-blue-100/50">
+						Sort:
+					</span>
 					{(
 						[
 							"title",
@@ -455,8 +474,8 @@ export default function BookExplorer({ books }: Props) {
 							onClick={() => handleSort(s)}
 							class={`text-xs px-2 py-1 rounded ${
 								sortBy === s
-									? "bg-blue-500/20 text-blue-400"
-									: "text-gray-500 hover:text-gray-700 dark:hover:text-gray-300"
+									? "bg-blue-500/10 text-blue-900 dark:text-blue-100"
+									: "text-blue-900/55 hover:text-blue-900 dark:text-blue-100/50 dark:hover:text-blue-100"
 							}`}
 						>
 							{s === "myRating"
@@ -476,7 +495,7 @@ export default function BookExplorer({ books }: Props) {
 					<button
 						type="button"
 						onClick={selectAllVisible}
-						class="text-xs text-blue-500 hover:text-blue-400"
+						class="text-xs text-blue-900/65 hover:text-blue-900 dark:text-blue-100/60 dark:hover:text-blue-100"
 					>
 						Select page
 					</button>
@@ -494,7 +513,7 @@ export default function BookExplorer({ books }: Props) {
 				{paginatedBooks.map((book) => (
 					<div
 						key={book.id}
-						class={`flex items-center gap-3 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors ${
+						class={`flex items-center gap-3 rounded-xl p-2 transition-colors hover:bg-white/20 dark:hover:bg-blue-950/20 ${
 							selectedIds.has(book.id) ? "bg-blue-500/10" : ""
 						}`}
 					>
@@ -510,7 +529,7 @@ export default function BookExplorer({ books }: Props) {
 									href={book.amazonSearchUrl}
 									target="_blank"
 									rel="noopener noreferrer"
-									class="font-medium truncate hover:text-blue-500"
+									class="truncate font-medium hover:text-blue-700 dark:hover:text-blue-200"
 								>
 									{book.title}
 								</a>
@@ -519,7 +538,7 @@ export default function BookExplorer({ books }: Props) {
 							<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
 								{book.author}
 								{book.recommender && (
-									<span class="text-purple-400 ml-2">
+									<span class="ml-2 text-blue-900/60 dark:text-blue-100/55">
 										via {book.recommender}
 									</span>
 								)}
@@ -555,7 +574,7 @@ export default function BookExplorer({ books }: Props) {
 					>
 						Previous
 					</button>
-					<span class="text-sm text-gray-500">
+					<span class="text-sm tabular-nums text-blue-900/60 dark:text-blue-100/55">
 						Page {page + 1} of {totalPages}
 					</span>
 					<button
@@ -571,7 +590,7 @@ export default function BookExplorer({ books }: Props) {
 
 			{/* Selection Panel */}
 			{selectedIds.size > 0 && (
-				<div class="fixed bottom-4 left-1/2 -translate-x-1/2 w-11/12 max-w-2xl p-4 rounded-lg bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 shadow-lg">
+				<div class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 w-11/12 max-w-2xl -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-800 dark:bg-slate-950">
 					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
 						<div>
 							<p class="font-medium">{selectedIds.size} books selected</p>

@@ -2,12 +2,11 @@
 import csvText from "../../public/data/goodreads_library_export.csv?raw";
 import BookExplorer from "../components/BookExplorer";
 import BaseLayout from "../layouts/BaseLayout.astro";
-import { parseGoodreadsData } from "../lib/books";
+import { computeStats, parseGoodreadsData } from "../lib/books";
 
 const pageTitle = "Books";
 const pageDescription = "Noospheric indices";
 
-// Curated favorites - always shown at top
 const favoriteBooks = [
 	{
 		title: "Wanting",
@@ -56,43 +55,88 @@ const favoriteBooks = [
 	{
 		title: "The Upanishads",
 		author: "Eknath Easwaran (translator)",
-		amazonLink: "https://www.amazon.com/Upanishads-Easwarans-Classics-Indian-Spirituality/dp/1586380214/"
+		amazonLink:
+			"https://www.amazon.com/Upanishads-Easwarans-Classics-Indian-Spirituality/dp/1586380214/",
 	},
 ];
 
-// Parse Goodreads data (imported at build time)
 const books = parseGoodreadsData(csvText);
+const stats = computeStats(books);
+const shelfStats = [
+	["read", stats.booksRead],
+	["reading", stats.currentlyReading],
+	["queued", stats.booksToRead],
+	["authors", stats.uniqueAuthors],
+];
 ---
 
 <BaseLayout pageTitle={pageTitle}>
-	<h1 class="text-4xl font-bold mb-4">{pageTitle}</h1>
-	<p class="mb-8">{pageDescription}</p>
+	<section class="mb-10 border-b border-blue-900/10 pb-8 dark:border-blue-100/10">
+		<p class="mb-3 text-sm text-blue-700/80 dark:text-blue-200/70">/books</p>
+		<h1 class="text-balance text-4xl font-semibold text-blue-950 dark:text-blue-50">
+			{pageTitle}
+		</h1>
+		<p class="mt-4 max-w-xl text-pretty text-blue-900/75 dark:text-blue-100/75">
+			{pageDescription}. A quiet shelf of touchstones, open loops, and books I keep returning to.
+		</p>
 
-	<section class="mb-10">
-		<h2 class="text-xl font-semibold mb-3 text-gray-700 dark:text-gray-300">
-			Favorites
-		</h2>
-		<div class="flex flex-wrap gap-2">
-			{
-				favoriteBooks.map((book) => (
+		<dl class="mt-6 grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-4">
+			{ shelfStats.map(([label, value]) => (
+				<div>
+					<dt class="text-xs text-blue-800/60 dark:text-blue-100/50">{label}</dt>
+					<dd class="mt-1 text-xl font-medium tabular-nums text-blue-950 dark:text-blue-50">
+						{value.toLocaleString()}
+					</dd>
+				</div>
+			)) }
+		</dl>
+	</section>
+
+	<section aria-labelledby="favorites-title" class="mb-12">
+		<div class="mb-4 flex items-baseline justify-between gap-4">
+			<h2 id="favorites-title" class="text-balance text-xl font-semibold text-blue-950 dark:text-blue-50">
+				Favorites
+			</h2>
+			<p class="text-xs tabular-nums text-blue-800/60 dark:text-blue-100/50">
+				{favoriteBooks.length} notes
+			</p>
+		</div>
+
+		<ol class="divide-y divide-blue-900/10 rounded-2xl border border-blue-900/10 bg-white/25 dark:divide-blue-100/10 dark:border-blue-100/10 dark:bg-blue-950/15">
+			{favoriteBooks.map((book, index) => (
+				<li>
 					<a
 						href={book.amazonLink}
 						target="_blank"
 						rel="noopener noreferrer"
-						class="px-3 py-1 text-sm rounded-full border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
-						title={`by ${book.author}`}
+						class="group grid grid-cols-[2rem_1fr] gap-3 px-4 py-3 transition-colors hover:bg-white/25 dark:hover:bg-blue-950/25"
 					>
-						{book.title}
+						<span class="pt-0.5 text-xs tabular-nums text-blue-800/50 dark:text-blue-100/40">
+							{String(index + 1).padStart(2, "0")}
+						</span>
+						<span>
+							<span class="block text-pretty font-medium text-blue-950 group-hover:text-blue-700 dark:text-blue-50 dark:group-hover:text-blue-200">
+								{book.title}
+							</span>
+							<span class="mt-0.5 block text-sm text-blue-900/60 dark:text-blue-100/55">
+								{book.author}
+							</span>
+						</span>
 					</a>
-				))
-			}
-		</div>
+				</li>
+			))}
+		</ol>
 	</section>
 
-	<section>
-		<h2 class="text-xl font-semibold mb-4 text-gray-700 dark:text-gray-300">
-			Library
-		</h2>
+	<section aria-labelledby="index-title">
+		<div class="mb-4">
+			<h2 id="index-title" class="text-balance text-xl font-semibold text-blue-950 dark:text-blue-50">
+				Index
+			</h2>
+			<p class="mt-1 text-pretty text-sm text-blue-900/65 dark:text-blue-100/60">
+				Search, filter, and sort the full Goodreads export.
+			</p>
+		</div>
 		<BookExplorer books={books} client:load />
 	</section>
 </BaseLayout>
