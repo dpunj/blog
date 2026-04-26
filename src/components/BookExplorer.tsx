@@ -242,30 +242,36 @@ export default function BookExplorer({ books }: Props) {
 
 			{/* Stats Panel */}
 			{showStats && (
-				<div class="space-y-4 rounded-2xl border border-blue-900/10 bg-white/25 p-4 dark:border-blue-100/10 dark:bg-blue-950/15">
+				<div class="space-y-5 rounded-2xl border border-blue-900/10 bg-white/20 p-4 dark:border-blue-100/10 dark:bg-blue-950/10">
 					{/* Rating Distribution */}
 					<div>
-						<h3 class="font-semibold text-lg mb-2">My Ratings</h3>
-						<div class="flex items-end gap-2 h-20">
+						<h3 class="mb-2 text-sm font-medium text-blue-950 dark:text-blue-50">
+							My Ratings
+						</h3>
+						<div class="flex h-20 items-end gap-2">
 							{stats.ratingDistribution.map((count, i) => {
 								const maxCount = Math.max(...stats.ratingDistribution, 1);
 								const height = (count / maxCount) * 100;
 								return (
-									<div key={i} class="flex-1 flex flex-col items-center gap-1">
+									<div key={i} class="flex flex-1 flex-col items-center gap-1">
 										<div
-											class="w-full bg-yellow-400 rounded-t"
+											class="w-full rounded-t bg-blue-500/35 dark:bg-blue-300/35"
 											style={{
 												height: `${height}%`,
 												minHeight: count > 0 ? "4px" : "0",
 											}}
 										/>
-										<span class="text-xs text-gray-500">{i + 1}★</span>
-										<span class="text-xs text-gray-400">{count}</span>
+										<span class="text-xs text-blue-900/55 dark:text-blue-100/50">
+											{i + 1}★
+										</span>
+										<span class="text-xs tabular-nums text-blue-900/45 dark:text-blue-100/40">
+											{count}
+										</span>
 									</div>
 								);
 							})}
 						</div>
-						<p class="text-xs text-gray-500 mt-2">
+						<p class="mt-2 text-xs tabular-nums text-blue-900/55 dark:text-blue-100/50">
 							Avg: {stats.avgMyRating.toFixed(1)}★ (Goodreads avg:{" "}
 							{stats.avgGoodreadsRating.toFixed(2)})
 						</p>
@@ -273,16 +279,18 @@ export default function BookExplorer({ books }: Props) {
 
 					{/* Top Authors */}
 					<div>
-						<h3 class="font-semibold text-lg mb-2">Top Authors</h3>
-						<div class="grid grid-cols-2 sm:grid-cols-5 gap-2">
+						<h3 class="mb-2 text-sm font-medium text-blue-950 dark:text-blue-50">
+							Top Authors
+						</h3>
+						<div class="grid grid-cols-2 gap-2 sm:grid-cols-5">
 							{stats.topAuthors.slice(0, 10).map((author) => (
 								<div
 									key={author.name}
-									class="text-sm px-2 py-1 rounded bg-white dark:bg-gray-700 truncate"
+									class="truncate rounded border border-blue-900/10 bg-white/25 px-2 py-1 text-sm dark:border-blue-100/10 dark:bg-blue-950/15"
 									title={author.name}
 								>
 									<span class="font-medium">{author.name}</span>
-									<span class="text-gray-500 dark:text-gray-400 ml-1">
+									<span class="ml-1 tabular-nums text-blue-900/50 dark:text-blue-100/45">
 										({author.count})
 									</span>
 								</div>
@@ -292,20 +300,24 @@ export default function BookExplorer({ books }: Props) {
 
 					{/* By Decade */}
 					<div>
-						<h3 class="font-semibold text-lg mb-2">By Decade</h3>
+						<h3 class="mb-2 text-sm font-medium text-blue-950 dark:text-blue-50">
+							By Decade
+						</h3>
 						<div class="space-y-1">
 							{stats.decadeBreakdown.map((d) => {
 								const percentage = (d.count / stats.totalBooks) * 100;
 								return (
 									<div key={d.decade} class="flex items-center gap-2">
-										<span class="text-sm w-14">{d.decade}</span>
-										<div class="flex-1 h-4 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+										<span class="w-14 text-sm text-blue-900/65 dark:text-blue-100/60">
+											{d.decade}
+										</span>
+										<div class="h-4 flex-1 overflow-hidden rounded bg-blue-500/10 dark:bg-blue-100/10">
 											<div
-												class={`h-full ${DECADE_COLORS[d.decade]?.split(" ")[0] || "bg-gray-500"}`}
+												class={`h-full ${DECADE_COLORS[d.decade]?.split(" ")[0] || "bg-blue-500/35"}`}
 												style={{ width: `${percentage}%` }}
 											/>
 										</div>
-										<span class="text-sm text-gray-500 w-16 text-right">
+										<span class="w-16 text-right text-sm tabular-nums text-blue-900/55 dark:text-blue-100/50">
 											{d.count} ({percentage.toFixed(0)}%)
 										</span>
 									</div>
@@ -317,14 +329,19 @@ export default function BookExplorer({ books }: Props) {
 					{/* Recommenders */}
 					{stats.topRecommenders.length > 0 && (
 						<div>
-							<h3 class="font-semibold text-lg mb-2">Recommended By</h3>
+							<h3 class="mb-2 text-sm font-medium text-blue-950 dark:text-blue-50">
+								Recommended By
+							</h3>
 							<div class="flex flex-wrap gap-2">
 								{stats.topRecommenders.map((rec) => (
 									<span
 										key={rec.name}
-										class="text-sm px-2 py-1 rounded bg-white dark:bg-gray-700"
+										class="rounded border border-blue-900/10 bg-white/25 px-2 py-1 text-sm dark:border-blue-100/10 dark:bg-blue-950/15"
 									>
-										{rec.name} <span class="text-gray-500">({rec.count})</span>
+										{rec.name}{" "}
+										<span class="tabular-nums text-blue-900/50 dark:text-blue-100/45">
+											({rec.count})
+										</span>
 									</span>
 								))}
 							</div>
@@ -441,7 +458,7 @@ export default function BookExplorer({ books }: Props) {
 				<button
 					type="button"
 					onClick={clearFilters}
-					class="text-xs text-red-500 hover:text-red-400"
+					class="text-xs text-blue-900/55 hover:text-blue-900 dark:text-blue-100/50 dark:hover:text-blue-100"
 				>
 					Clear filters
 				</button>
@@ -491,7 +508,7 @@ export default function BookExplorer({ books }: Props) {
 
 			{/* Book List */}
 			<div class="space-y-1">
-				<div class="flex items-center gap-2 mb-2">
+				<div class="mb-2 flex items-center gap-2">
 					<button
 						type="button"
 						onClick={selectAllVisible}
@@ -503,7 +520,7 @@ export default function BookExplorer({ books }: Props) {
 						<button
 							type="button"
 							onClick={clearSelection}
-							class="text-xs text-red-500 hover:text-red-400"
+							class="text-xs text-blue-900/55 hover:text-blue-900 dark:text-blue-100/50 dark:hover:text-blue-100"
 						>
 							Clear selection ({selectedIds.size})
 						</button>
@@ -518,12 +535,13 @@ export default function BookExplorer({ books }: Props) {
 						}`}
 					>
 						<input
+							aria-label={`Select ${book.title}`}
 							type="checkbox"
 							checked={selectedIds.has(book.id)}
 							onChange={() => toggleSelection(book.id)}
-							class="w-4 h-4 rounded border-gray-300 dark:border-gray-600"
+							class="size-4 rounded border-blue-900/20 text-blue-700 dark:border-blue-100/20"
 						/>
-						<div class="flex-1 min-w-0">
+						<div class="min-w-0 flex-1">
 							<div class="flex items-center gap-2">
 								<a
 									href={book.amazonSearchUrl}
@@ -535,7 +553,7 @@ export default function BookExplorer({ books }: Props) {
 								</a>
 								{book.myRating > 0 && <StarRating rating={book.myRating} />}
 							</div>
-							<div class="text-sm text-gray-500 dark:text-gray-400 truncate">
+							<div class="truncate text-sm text-blue-900/58 dark:text-blue-100/55">
 								{book.author}
 								{book.recommender && (
 									<span class="ml-2 text-blue-900/60 dark:text-blue-100/55">
@@ -544,10 +562,10 @@ export default function BookExplorer({ books }: Props) {
 								)}
 							</div>
 						</div>
-						<div class="hidden sm:block text-xs text-gray-400 dark:text-gray-500 w-12 text-right">
+						<div class="hidden w-12 text-right text-xs tabular-nums text-blue-900/42 dark:text-blue-100/40 sm:block">
 							{book.pages > 0 ? `${book.pages}p` : ""}
 						</div>
-						<div class="text-xs text-gray-400 dark:text-gray-500 w-12 text-right">
+						<div class="w-12 text-right text-xs tabular-nums text-blue-900/42 dark:text-blue-100/40">
 							{book.yearPublished || ""}
 						</div>
 						<span
@@ -570,7 +588,7 @@ export default function BookExplorer({ books }: Props) {
 						type="button"
 						onClick={() => setPage((p) => Math.max(0, p - 1))}
 						disabled={page === 0}
-						class="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800"
+						class="rounded border border-blue-900/10 px-3 py-1 hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-100/10 dark:hover:bg-blue-950/20"
 					>
 						Previous
 					</button>
@@ -581,7 +599,7 @@ export default function BookExplorer({ books }: Props) {
 						type="button"
 						onClick={() => setPage((p) => Math.min(totalPages - 1, p + 1))}
 						disabled={page >= totalPages - 1}
-						class="px-3 py-1 rounded border border-gray-300 dark:border-gray-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-gray-100 dark:hover:bg-gray-800"
+						class="rounded border border-blue-900/10 px-3 py-1 hover:bg-white/25 disabled:cursor-not-allowed disabled:opacity-50 dark:border-blue-100/10 dark:hover:bg-blue-950/20"
 					>
 						Next
 					</button>
@@ -590,11 +608,11 @@ export default function BookExplorer({ books }: Props) {
 
 			{/* Selection Panel */}
 			{selectedIds.size > 0 && (
-				<div class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 w-11/12 max-w-2xl -translate-x-1/2 rounded-2xl border border-slate-200 bg-white p-4 shadow-lg dark:border-slate-800 dark:bg-slate-950">
-					<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+				<div class="fixed bottom-[calc(1rem+env(safe-area-inset-bottom))] left-1/2 w-11/12 max-w-2xl -translate-x-1/2 rounded-2xl border border-blue-900/10 bg-white p-4 shadow-lg dark:border-blue-100/10 dark:bg-blue-950">
+					<div class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
 						<div>
 							<p class="font-medium">{selectedIds.size} books selected</p>
-							<p class="text-sm text-gray-500 dark:text-gray-400">
+							<p class="text-sm tabular-nums text-blue-900/60 dark:text-blue-100/55">
 								{selectedBooks
 									.reduce((sum, b) => sum + b.pages, 0)
 									.toLocaleString()}{" "}
@@ -607,10 +625,10 @@ export default function BookExplorer({ books }: Props) {
 								onClick={() =>
 									copyToClipboard(exportAsJson(selectedBooks), "JSON")
 								}
-								class={`text-xs px-3 py-1 rounded border ${
+								class={`rounded border px-3 py-1 text-xs ${
 									copySuccess === "JSON"
-										? "bg-green-500/20 text-green-400 border-green-500/30"
-										: "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+										? "border-blue-500/30 bg-blue-500/15 text-blue-900 dark:text-blue-100"
+										: "border-blue-900/10 hover:bg-white/25 dark:border-blue-100/10 dark:hover:bg-blue-950/20"
 								}`}
 							>
 								{copySuccess === "JSON" ? "Copied!" : "Copy JSON"}
@@ -620,10 +638,10 @@ export default function BookExplorer({ books }: Props) {
 								onClick={() =>
 									copyToClipboard(exportAsText(selectedBooks), "Text")
 								}
-								class={`text-xs px-3 py-1 rounded border ${
+								class={`rounded border px-3 py-1 text-xs ${
 									copySuccess === "Text"
-										? "bg-green-500/20 text-green-400 border-green-500/30"
-										: "border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-800"
+										? "border-blue-500/30 bg-blue-500/15 text-blue-900 dark:text-blue-100"
+										: "border-blue-900/10 hover:bg-white/25 dark:border-blue-100/10 dark:hover:bg-blue-950/20"
 								}`}
 							>
 								{copySuccess === "Text" ? "Copied!" : "Copy List"}
@@ -631,7 +649,7 @@ export default function BookExplorer({ books }: Props) {
 							<button
 								type="button"
 								onClick={clearSelection}
-								class="text-xs px-3 py-1 rounded border border-red-500/30 text-red-500 hover:bg-red-500/10"
+								class="rounded border border-blue-900/10 px-3 py-1 text-xs text-blue-900/65 hover:bg-white/25 dark:border-blue-100/10 dark:text-blue-100/60 dark:hover:bg-blue-950/20"
 							>
 								Clear
 							</button>

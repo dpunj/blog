@@ -3,6 +3,9 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+	--font-sans: "Instrument Sans", ui-sans-serif, system-ui, sans-serif;
+	--font-serif: "Newsreader", ui-serif, Georgia, Cambria, serif;
+
 	--animate-fade-in: fade-in 0.5s ease-in-out;
 	--animate-slide-in: slide-in 0.5s ease-in-out;
 
@@ -71,8 +74,13 @@
 
 body {
 	@apply bg-linear-to-b from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-950;
-	@apply text-blue-900 dark:text-blue-100;
+	@apply font-sans text-blue-900 antialiased dark:text-blue-100;
 	@apply min-h-screen transition-colors duration-300;
+	font-feature-settings:
+		"kern" 1,
+		"liga" 1,
+		"calt" 1;
+	text-rendering: optimizeLegibility;
 }
 
 ::selection {

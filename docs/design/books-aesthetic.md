@@ -24,6 +24,7 @@ For this site, translate that inspiration into a more minimal personal-library l
 - **blue-native**: stay close to the existing blue theme rather than adding a new palette
 - **restrained surfaces**: thin borders, subtle translucency, minimal shadow
 - **text as interface**: numbered lists, small labels, and quiet metadata over large cards
+- **literary typography**: serif for page titles, intros, and touchstone notes; sans for controls and dense browsing
 
 ## What to avoid
 
@@ -60,20 +61,29 @@ They can be good internal prompts, but they quickly make the UI feel too big if 
 
 ## `/books` implementation notes
 
-The current `/books` experiment keeps the normal site width and uses three simple sections:
+The current `/books` experiment keeps the normal site width and uses four simple sections:
 
 1. intro with tiny stats
-2. favorites as a restrained numbered list
-3. full Goodreads index via `BookExplorer`
+2. currently open books as a small thread list
+3. favorites as a restrained numbered list with short notes
+4. full Goodreads index via `BookExplorer`
 
 `BookExplorer` should remain functional and familiar. Style changes should soften it, not hide its utility.
+
+## Typography direction
+
+The site now uses a two-font system:
+
+- **Instrument Sans** for the default UI layer: navigation, filters, metadata, dense index controls.
+- **Newsreader** for the literary layer: `/books` headings, intro copy, book titles, and touchstone notes.
+
+Use the serif sparingly. It should make reading feel warmer without turning every control into a manuscript.
 
 ## Future ideas
 
 Small next steps that fit the direction:
 
-- add a short note field to favorites explaining why each book matters
 - group favorites by theme only if the list grows
-- add one subtle typographic marker for “currently reading”
+- add a one-line “why now” note to currently open books if the data source supports it
 - bring a similar quiet archive language to `/library` later
 - consider a dedicated `/reading` or `/shelf` view only if `/books` starts carrying too much

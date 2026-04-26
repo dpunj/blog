@@ -11,50 +11,59 @@ const favoriteBooks = [
 	{
 		title: "Wanting",
 		author: "Luke Burgis",
+		note: "Desire as weather: borrowed, contagious, worth noticing.",
 		amazonLink:
 			"https://www.amazon.com/Wanting-Power-Mimetic-Desire-Everyday/dp/1250262488/",
 	},
 	{
 		title: "Meditations (t. by Gregory Hays)",
 		author: "Marcus Aurelius",
+		note: "Portable discipline for returning attention to what can be carried.",
 		amazonLink: "https://www.amazon.com/Meditations-Marcus-Aurelius/dp/0812968255/",
 	},
 	{
 		title: "Thinking in Systems",
 		author: "Donella H. Meadows",
+		note: "Feedback loops, leverage points, and patience with complexity.",
 		amazonLink:
 			"https://www.amazon.com/Thinking-Systems-Donella-H-Meadows/dp/1603580557/",
 	},
 	{
 		title: "The Evolving Self",
 		author: "Robert Kegan",
+		note: "A map for how the self keeps outgrowing its container.",
 		amazonLink:
 			"https://www.amazon.com/Evolving-Self-Problem-Process-Development/dp/0674272315/",
 	},
 	{
 		title: "Range",
 		author: "David Epstein",
+		note: "Permission to roam, sample, and let breadth compound.",
 		amazonLink:
 			"https://www.amazon.com/Range-Generalists-Triumph-Specialized-World/dp/0735214484/",
 	},
 	{
 		title: "Gödel, Escher, Bach",
 		author: "Douglas Hofstadter",
+		note: "Strange loops as a reminder that play can be rigorous.",
 		amazonLink: "https://a.co/d/4khX6GJ",
 	},
 	{
 		title: "Siddhartha",
 		author: "Hermann Hesse",
+		note: "A short river-book about listening before naming.",
 		amazonLink: "https://a.co/d/3P4MyJW",
 	},
 	{
 		title: "The Creative Act",
 		author: "Rick Rubin",
+		note: "Practice as receptivity: make the conditions, then get quiet.",
 		amazonLink: "https://a.co/d/3P4MyJW",
 	},
 	{
 		title: "The Upanishads",
 		author: "Eknath Easwaran (translator)",
+		note: "Ancient negative space around self, attention, and the real.",
 		amazonLink:
 			"https://www.amazon.com/Upanishads-Easwarans-Classics-Indian-Spirituality/dp/1586380214/",
 	},
@@ -62,6 +71,9 @@ const favoriteBooks = [
 
 const books = parseGoodreadsData(csvText);
 const stats = computeStats(books);
+const currentReadingBooks = books
+	.filter((book) => book.exclusiveShelf === "currently-reading")
+	.slice(0, 5);
 const shelfStats = [
 	["read", stats.booksRead],
 	["reading", stats.currentlyReading],
@@ -73,10 +85,10 @@ const shelfStats = [
 <BaseLayout pageTitle={pageTitle}>
 	<section class="mb-10 border-b border-blue-900/10 pb-8 dark:border-blue-100/10">
 		<p class="mb-3 text-sm text-blue-700/80 dark:text-blue-200/70">/books</p>
-		<h1 class="text-balance text-4xl font-semibold text-blue-950 dark:text-blue-50">
+		<h1 class="text-balance font-serif text-4xl font-medium text-blue-950 dark:text-blue-50">
 			{pageTitle}
 		</h1>
-		<p class="mt-4 max-w-xl text-pretty text-blue-900/75 dark:text-blue-100/75">
+		<p class="mt-4 max-w-xl text-pretty font-serif text-lg text-blue-900/75 dark:text-blue-100/75">
 			{pageDescription}. A quiet shelf of touchstones, open loops, and books I keep returning to.
 		</p>
 
@@ -92,13 +104,54 @@ const shelfStats = [
 		</dl>
 	</section>
 
+	{currentReadingBooks.length > 0 && (
+		<section aria-labelledby="currently-open-title" class="mb-12">
+			<div class="mb-4 flex items-baseline justify-between gap-4">
+				<h2 id="currently-open-title" class="text-balance font-serif text-xl font-medium text-blue-950 dark:text-blue-50">
+					Currently open
+				</h2>
+				<p class="text-xs tabular-nums text-blue-800/60 dark:text-blue-100/50">
+					{currentReadingBooks.length} threads
+				</p>
+			</div>
+
+			<ol class="divide-y divide-blue-900/10 rounded-2xl border border-blue-900/10 bg-white/20 dark:divide-blue-100/10 dark:border-blue-100/10 dark:bg-blue-950/10">
+				{currentReadingBooks.map((book) => (
+					<li>
+						<a
+							href={book.amazonSearchUrl}
+							target="_blank"
+							rel="noopener noreferrer"
+							class="group grid grid-cols-[2rem_1fr_auto] items-center gap-3 px-4 py-3 transition-colors hover:bg-white/25 dark:hover:bg-blue-950/25"
+						>
+							<span class="text-center text-sm text-blue-700/55 dark:text-blue-200/45" aria-hidden="true">
+								◌
+							</span>
+							<span class="min-w-0">
+								<span class="block truncate font-serif text-lg font-medium text-blue-950 group-hover:text-blue-700 dark:text-blue-50 dark:group-hover:text-blue-200">
+									{book.title}
+								</span>
+								<span class="mt-0.5 block truncate text-sm text-blue-900/60 dark:text-blue-100/55">
+									{book.author}
+								</span>
+							</span>
+							<span class="hidden text-xs tabular-nums text-blue-800/45 dark:text-blue-100/40 sm:block">
+								{book.pages > 0 ? `${book.pages}p` : "open"}
+							</span>
+						</a>
+					</li>
+				))}
+			</ol>
+		</section>
+	)}
+
 	<section aria-labelledby="favorites-title" class="mb-12">
 		<div class="mb-4 flex items-baseline justify-between gap-4">
-			<h2 id="favorites-title" class="text-balance text-xl font-semibold text-blue-950 dark:text-blue-50">
+			<h2 id="favorites-title" class="text-balance font-serif text-xl font-medium text-blue-950 dark:text-blue-50">
 				Favorites
 			</h2>
 			<p class="text-xs tabular-nums text-blue-800/60 dark:text-blue-100/50">
-				{favoriteBooks.length} notes
+				{favoriteBooks.length} touchstones
 			</p>
 		</div>
 
@@ -115,11 +168,14 @@ const shelfStats = [
 							{String(index + 1).padStart(2, "0")}
 						</span>
 						<span>
-							<span class="block text-pretty font-medium text-blue-950 group-hover:text-blue-700 dark:text-blue-50 dark:group-hover:text-blue-200">
+							<span class="block text-pretty font-serif text-lg font-medium text-blue-950 group-hover:text-blue-700 dark:text-blue-50 dark:group-hover:text-blue-200">
 								{book.title}
 							</span>
 							<span class="mt-0.5 block text-sm text-blue-900/60 dark:text-blue-100/55">
 								{book.author}
+							</span>
+							<span class="mt-2 block text-pretty font-serif text-base text-blue-900/70 dark:text-blue-100/65">
+								{book.note}
 							</span>
 						</span>
 					</a>
@@ -130,7 +186,7 @@ const shelfStats = [
 
 	<section aria-labelledby="index-title">
 		<div class="mb-4">
-			<h2 id="index-title" class="text-balance text-xl font-semibold text-blue-950 dark:text-blue-50">
+			<h2 id="index-title" class="text-balance font-serif text-xl font-medium text-blue-950 dark:text-blue-50">
 				Index
 			</h2>
 			<p class="mt-1 text-pretty text-sm text-blue-900/65 dark:text-blue-100/60">
