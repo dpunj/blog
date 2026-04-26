@@ -33,8 +33,8 @@ export function getDb(): Database {
 			source TEXT NOT NULL, -- 'readwise' | 'zotero' | 'goodreads' | 'spotify' | 'manual'
 			source_id TEXT, -- ID from the source system
 			metadata TEXT, -- JSON for source-specific data
-			created_at TEXT DEFAULT (datetime('now')),
-			updated_at TEXT DEFAULT (datetime('now')),
+			created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
+			updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now')),
 			classified_at TEXT,
 			UNIQUE(source, source_id)
 		)
@@ -46,7 +46,7 @@ export function getDb(): Database {
 			name TEXT NOT NULL UNIQUE,
 			parent_id INTEGER REFERENCES tags(id),
 			description TEXT,
-			created_at TEXT DEFAULT (datetime('now'))
+			created_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 		)
 	`);
 
@@ -98,9 +98,45 @@ export function getDb(): Database {
 	if (!columnNames.has("date_published")) {
 		db.run("ALTER TABLE resources ADD COLUMN date_published TEXT");
 	}
+	if (!columnNames.has("reading_progress")) {
+		db.run("ALTER TABLE resources ADD COLUMN reading_progress REAL");
+	}
+	if (!columnNames.has("item_type")) {
+		db.run("ALTER TABLE resources ADD COLUMN item_type TEXT");
+	}
+	if (!columnNames.has("publication_title")) {
+		db.run("ALTER TABLE resources ADD COLUMN publication_title TEXT");
+	}
+	if (!columnNames.has("source_created_at")) {
+		db.run("ALTER TABLE resources ADD COLUMN source_created_at TEXT");
+	}
+	if (!columnNames.has("source_updated_at")) {
+		db.run("ALTER TABLE resources ADD COLUMN source_updated_at TEXT");
+	}
+	if (!columnNames.has("last_seen_at")) {
+		db.run("ALTER TABLE resources ADD COLUMN last_seen_at TEXT");
+	}
+
+	db.run(`
+		CREATE TABLE IF NOT EXISTS sync_state (
+			source TEXT PRIMARY KEY,
+			last_started_at TEXT,
+			last_success_at TEXT,
+			high_water_mark TEXT,
+			version INTEGER,
+			metadata TEXT,
+			updated_at TEXT DEFAULT (strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		)
+	`);
 
 	db.run(
 		"CREATE INDEX IF NOT EXISTS idx_resources_status ON resources(status)",
+	);
+	db.run(
+		"CREATE INDEX IF NOT EXISTS idx_resources_source_created ON resources(source_created_at)",
+	);
+	db.run(
+		"CREATE INDEX IF NOT EXISTS idx_resources_last_seen ON resources(last_seen_at)",
 	);
 
 	return db;
@@ -134,6 +170,16 @@ export type ResourceSource =
 
 export type ConsumptionStatus = "now" | "next" | "done" | "dropped" | null;
 
+export interface SyncState {
+	source: ResourceSource;
+	last_started_at?: string;
+	last_success_at?: string;
+	high_water_mark?: string;
+	version?: number;
+	metadata?: Record<string, unknown>;
+	updated_at?: string;
+}
+
 export interface Resource {
 	id: string;
 	type: ResourceType;
@@ -148,10 +194,13 @@ export interface Resource {
 	created_at?: string;
 	updated_at?: string;
 	classified_at?: string;
-	// Readwise-specific
+	// Source/library metadata
 	image_url?: string;
 	reading_progress?: number;
 	date_published?: string;
+	source_created_at?: string;
+	source_updated_at?: string;
+	last_seen_at?: string;
 	// Zotero-specific
 	item_type?: string;
 	publication_title?: string;
@@ -164,12 +213,64 @@ export interface Resource {
 	queue_priority?: number;
 }
 
+export function getSyncState(
+	db: Database,
+	source: ResourceSource,
+): SyncState | undefined {
+	const row = db
+		.prepare("SELECT * FROM sync_state WHERE source = ?")
+		.get(source) as Record<string, unknown> | undefined;
+
+	if (!row) return undefined;
+
+	return {
+		source: row.source as ResourceSource,
+		last_started_at: row.last_started_at as string | undefined,
+		last_success_at: row.last_success_at as string | undefined,
+		high_water_mark: row.high_water_mark as string | undefined,
+		version:
+			typeof row.version === "number"
+				? row.version
+				: row.version
+					? Number(row.version)
+					: undefined,
+		metadata: row.metadata
+			? (JSON.parse(row.metadata as string) as Record<string, unknown>)
+			: undefined,
+		updated_at: row.updated_at as string | undefined,
+	};
+}
+
+export function saveSyncState(db: Database, state: SyncState): void {
+	db.prepare(
+		`
+		INSERT INTO sync_state (source, last_started_at, last_success_at, high_water_mark, version, metadata, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
+		ON CONFLICT(source) DO UPDATE SET
+			last_started_at = excluded.last_started_at,
+			last_success_at = excluded.last_success_at,
+			high_water_mark = excluded.high_water_mark,
+			version = excluded.version,
+			metadata = excluded.metadata,
+			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
+	`,
+	).run(
+		state.source,
+		state.last_started_at ?? null,
+		state.last_success_at ?? null,
+		state.high_water_mark ?? null,
+		state.version ?? null,
+		state.metadata ? JSON.stringify(state.metadata) : null,
+	);
+}
+
 // Insert or update a resource
 export function upsertResource(db: Database, resource: Resource): void {
 	const stmt = db.prepare(`
 		INSERT INTO resources (id, type, title, url, author, description, tags, source, source_id, metadata, 
-			status, status_manual, platform_status, favorited, rating, queue_priority, image_url, date_published, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, datetime('now'))
+			status, status_manual, platform_status, favorited, rating, queue_priority, image_url, date_published,
+			reading_progress, item_type, publication_title, source_created_at, source_updated_at, last_seen_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, strftime('%Y-%m-%dT%H:%M:%fZ', 'now'))
 		ON CONFLICT(id) DO UPDATE SET
 			type = excluded.type,
 			title = excluded.title,
@@ -183,12 +284,19 @@ export function upsertResource(db: Database, resource: Resource): void {
 			platform_status = excluded.platform_status,
 			image_url = COALESCE(excluded.image_url, resources.image_url),
 			date_published = COALESCE(excluded.date_published, resources.date_published),
-			-- Only update status/priority if NOT manually curated
+			reading_progress = COALESCE(excluded.reading_progress, resources.reading_progress),
+			item_type = COALESCE(excluded.item_type, resources.item_type),
+			publication_title = COALESCE(excluded.publication_title, resources.publication_title),
+			source_created_at = COALESCE(excluded.source_created_at, resources.source_created_at),
+			source_updated_at = COALESCE(excluded.source_updated_at, resources.source_updated_at),
+			last_seen_at = COALESCE(excluded.last_seen_at, resources.last_seen_at),
+			status_manual = MAX(resources.status_manual, excluded.status_manual),
+			-- Only update status/priority if the existing row is not manually curated
 			status = CASE WHEN resources.status_manual = 1 THEN resources.status ELSE excluded.status END,
 			queue_priority = CASE WHEN resources.status_manual = 1 THEN resources.queue_priority ELSE excluded.queue_priority END,
 			favorited = COALESCE(excluded.favorited, resources.favorited),
 			rating = COALESCE(excluded.rating, resources.rating),
-			updated_at = datetime('now')
+			updated_at = strftime('%Y-%m-%dT%H:%M:%fZ', 'now')
 	`);
 
 	stmt.run(
@@ -210,6 +318,12 @@ export function upsertResource(db: Database, resource: Resource): void {
 		resource.queue_priority ?? null,
 		resource.image_url ?? null,
 		resource.date_published ?? null,
+		resource.reading_progress ?? null,
+		resource.item_type ?? null,
+		resource.publication_title ?? null,
+		resource.source_created_at ?? null,
+		resource.source_updated_at ?? null,
+		resource.last_seen_at ?? null,
 	);
 }
 
@@ -245,7 +359,9 @@ export function getAllResources(db: Database): Resource[] {
 // Get library resources (readwise + zotero)
 export function getLibraryResources(db: Database): Resource[] {
 	const stmt = db.prepare(
-		"SELECT * FROM resources WHERE source IN ('readwise', 'zotero') ORDER BY created_at DESC",
+		`SELECT * FROM resources
+		WHERE source IN ('readwise', 'zotero')
+		ORDER BY COALESCE(source_created_at, created_at) DESC, id ASC`,
 	);
 	const rows = stmt.all() as Record<string, unknown>[];
 

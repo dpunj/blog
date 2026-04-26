@@ -113,7 +113,7 @@ A browsable archive of bookmarks (Readwise) and papers (Zotero) with hierarchica
 
 **Data Flow:**
 ```
-Readwise/Zotero APIs → sync.ts → SQLite → --export-library → library.json → /library page
+Readwise/Zotero APIs → sync.ts → SQLite sync_state/resources → --export-library → library.json → /library page
 ```
 
 **Key Files:**
@@ -136,8 +136,8 @@ TMDB_API_KEY=xxx
 ```
 
 **Updating the Library:**
-1. Run `bun sync api` to fetch latest from Readwise + Zotero (slow, rate limited)
-2. Run `bun sync --export-library` to regenerate JSON for Astro
+1. Run `bun sync api --export-library` to fetch latest resources and regenerate JSON
+2. Use `bun sync readwise --full` or `bun sync zotero --full` only for full backfills
 3. Edit `src/data/tag-hierarchy.json` to organize new tags
 4. Uncategorized tags appear at the bottom of the tag tree
 
@@ -192,21 +192,27 @@ API sources (Readwise, Zotero) ──┘
 # Granular sync
 bun sync books        # Goodreads CSV → SQLite
 bun sync music        # Spotify JSON → SQLite
-bun sync readwise     # Readwise API → SQLite (slow)
-bun sync zotero       # Zotero API → SQLite (slow)
+bun sync readwise     # Readwise API → SQLite (incremental after first run)
+bun sync zotero       # Zotero API → SQLite (incremental after first run)
 bun sync letterboxd   # Letterboxd RSS → SQLite
 bun sync rawg         # RAWG API → SQLite
 
 # Grouped sync
 bun sync local        # books + music (fast, no API calls)
-bun sync api          # readwise + zotero + letterboxd + rawg (slow, rate limited)
+bun sync api          # readwise + zotero + letterboxd + rawg
 bun sync all          # everything
 
+# Incremental/full controls
+bun sync readwise --full          # ignore saved Readwise state
+bun sync zotero --full            # ignore saved Zotero version
+bun sync readwise --since <ISO>   # override Readwise incremental timestamp
+
 # Export & stats
-bun sync --export-library   # SQLite → public/data/library.json
-bun sync --export-now       # SQLite → public/data/now.json (for /now page)
-bun sync --stats            # Show database stats
-bun sync --export TYPE      # Export to stdout (book|track|movie|game|article|paper|all)
+bun sync api --export-library     # sync APIs, then export library JSON
+bun sync --export-library         # SQLite → public/data/library.json
+bun sync --export-now             # SQLite → public/data/now.json (for /now page)
+bun sync --stats                  # Show database stats
+bun sync --export TYPE            # Export to stdout (book|track|movie|game|article|paper|all)
 ```
 
 ### Data Sources
@@ -223,19 +229,21 @@ bun sync --export TYPE      # Export to stdout (book|track|movie|game|article|pa
 
 ### API Sync Details
 
-The `bun sync api` command fetches from Readwise and Zotero APIs with built-in rate limiting:
+The `bun sync api` command fetches from API sources with built-in rate limiting:
 
-| API | Rate Limit | Delay Between Requests |
-|-----|------------|------------------------|
-| Readwise | 20 req/min | 3.5 seconds |
-| Zotero | 1 req/sec | 1.1 seconds |
+| API | Rate Limit | Delay Between Requests | Incremental State |
+|-----|------------|------------------------|-------------------|
+| Readwise | 20 req/min | 3.5 seconds | `updatedAfter` timestamp |
+| Zotero | 1 req/sec | 1.1 seconds | Zotero library version |
 
 **Features:**
-- **Pagination** — automatically fetches all pages
-- **Retry on 429** — respects `Retry-After` header, up to 3 retries
-- **Upsert** — existing resources updated, new ones inserted (no duplicates)
+- **Incremental by default** after the first successful Readwise/Zotero sync
+- **Full backfills** with `--full`; Readwise timestamp overrides with `--since <ISO>`
+- **Page-by-page upserts** with transactions and progress logs
+- **Retries/timeouts** for 429, transient 5xx, and network failures
+- **Atomic exports** for `library.json` and `now.json`
 
-**Typical runtime:** 2-5 minutes depending on library size.
+**Typical runtime:** first Readwise backfill can take several minutes for large libraries; later incremental runs should be much faster.
 
 ### Now Page (Media Queue)
 
