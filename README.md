@@ -14,6 +14,9 @@ Personal blog built with [Astro](https://astro.build).
 | `bun preview` | Preview build locally |
 | `bun sync api --export-library` | Sync Readwise/Zotero/etc. and export `/library` data |
 | `bun sync --stats` | Show local knowledge DB stats |
+| `bun zirp inventory` | Inventory the local `divesh_zirp` corpus |
+| `bun zirp search "games as training grounds"` | Search the personal oracle corpus |
+| `bun zirp ask "what should I write next?"` | Ask the oracle; uses Anthropic if configured, otherwise prints the prompt |
 
 ## Linting & Formatting
 
@@ -43,7 +46,10 @@ src/
 └── styles/          # Global CSS
 scripts/
 ├── db.ts            # SQLite knowledge base helpers
-└── sync.ts          # Sync/export CLI
+├── sync.ts          # Sync/export CLI
+└── zirp.ts          # Local-first personal oracle CLI
+docs/
+└── zirp/            # divesh_zirp architecture, persona docs, and PR notes
 public/
 └── data/            # Generated/static data files
 ```
@@ -79,6 +85,21 @@ Notes:
 - First Readwise sync can take several minutes for large libraries.
 - Later Readwise/Zotero runs are incremental via saved `sync_state` in `data/knowledge.db`.
 - `data/` and generated JSON exports are ignored; regenerate them locally.
+
+### Personal Oracle (`divesh_zirp`)
+
+A local-first personal oracle inspired by `vgr_zirp`. It retrieves from blog posts, selected notes, Versa context, Readwise/Zotero metadata, Goodreads, and Spotify, then composes grounded prompts using explicit persona docs in `docs/zirp/`.
+
+```bash
+bun zirp inventory
+bun zirp search "games as training grounds"
+bun zirp prompt "connect WoW, feedback loops, and Versa"
+bun zirp ask "what should I write next?"
+```
+
+Privacy defaults: `journal/` is excluded unless `--include-journal` is passed; API calls only happen when `ANTHROPIC_API_KEY` exists.
+
+See `docs/zirp/README.md` and `docs/zirp/ARCHITECTURE.md`.
 
 ## Content
 
