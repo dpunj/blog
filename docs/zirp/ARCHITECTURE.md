@@ -43,6 +43,7 @@ bun zirp inventory
 bun zirp init-db
 bun zirp index
 bun zirp stats
+bun zirp serve
 bun zirp search "games as training grounds"
 bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"

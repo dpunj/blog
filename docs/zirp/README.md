@@ -46,6 +46,7 @@ The goal is not to build a generic chatbot. The goal is to make the corpus query
 - `docs/zirp/ARCHITECTURE.md` — technical architecture and corpus tiering.
 - `docs/zirp/SQLITE_PLAN.md` — follow-up plan for namespaced ZIRP tables in the existing SQLite DB.
 - `docs/zirp/DX.md` — daily-use walkthrough, model config, golden queries, and troubleshooting.
+- `docs/zirp/WEB_CLIENT.md` — local web cockpit and public-facing oracle plan.
 
 ## Commands
 
@@ -54,6 +55,7 @@ bun zirp inventory
 bun zirp init-db
 bun zirp index
 bun zirp stats
+bun zirp serve
 bun zirp search "games as training grounds"
 bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
