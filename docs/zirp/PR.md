@@ -4,7 +4,7 @@
 
 This PR adds `divesh_zirp`: a local-first personal oracle for querying Divesh's writing, taste corpus, saved resources, and founder context.
 
-Inspired by Venkatesh Rao's `vgr_zirp`, this v0 keeps the architecture intentionally simple and private: weighted local retrieval, explicit persona docs, source citations, and optional LLM answering only when `ANTHROPIC_API_KEY` is configured.
+Inspired by Venkatesh Rao's `vgr_zirp`, this v0 keeps the architecture intentionally simple and private: weighted local retrieval, explicit persona docs, source citations, and optional LLM answering only when a model API key is configured.
 
 ## Why
 
@@ -40,7 +40,7 @@ This repo's version adapts that pattern for a private, local-first personal corp
   - `inventory` — counts local corpus docs by tier/kind.
   - `search` — weighted local lexical retrieval with source snippets.
   - `prompt` — composes a full prompt with retrieved sources + persona docs.
-  - `ask` — calls Anthropic if `ANTHROPIC_API_KEY` exists; otherwise prints the prompt.
+  - `ask` — calls a configured model API if available; otherwise prints the prompt.
 - Added `bun zirp` package script.
 - Added seed persona docs:
   - `docs/zirp/SOUL.md`
@@ -68,7 +68,7 @@ This repo's version adapts that pattern for a private, local-first personal corp
 - Existing `data/knowledge.db` is opened read-only/immutable.
 - Source notes are never modified.
 - Legal/data archive folders are not crawled.
-- Network calls only happen for `ask`, and only if `ANTHROPIC_API_KEY` exists.
+- Network calls only happen for `ask`, and only if `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` exists.
 
 ## Example commands
 

@@ -8,7 +8,17 @@ import { basename, extname, join, relative, resolve } from "node:path";
 const BLOG_ROOT = resolve(import.meta.dir, "..");
 const NOTES_ROOT = process.env.NOTES_ROOT ?? "/Users/dpunj/notes";
 const KNOWLEDGE_DB_PATH = join(BLOG_ROOT, "data/knowledge.db");
-const DEFAULT_MODEL = process.env.ZIRP_MODEL ?? "claude-haiku-4-5-20251001";
+const DEFAULT_OPENAI_MODEL = "gpt-5.5";
+const DEFAULT_ANTHROPIC_MODEL = "claude-haiku-4-5-20251001";
+const DEFAULT_REASONING_EFFORT = "low";
+
+type ZirpProvider = "openai" | "anthropic";
+
+type ModelConfig = {
+	provider: ZirpProvider;
+	model: string;
+	reasoningEffort: "minimal" | "low" | "medium" | "high";
+};
 
 type CorpusTier =
 	| "self"
@@ -87,12 +97,14 @@ Commands:
   bun zirp stats
   bun zirp search <query> [--limit 8] [--include-journal] [--memory]
   bun zirp prompt <query> [--include-journal] [--memory]
-  bun zirp ask <query> [--include-journal] [--memory]
+  bun zirp ask <query> [--include-journal] [--memory] [--provider openai|anthropic] [--model gpt-5.5] [--reasoning-effort low]
 
 Notes:
   - journal/ is excluded unless --include-journal is passed.
   - search/prompt/ask prefer the SQLite index when available; use --memory to force v0 in-memory search.
-  - ask uses ANTHROPIC_API_KEY if present; otherwise it prints the prompt.`);
+  - ask defaults to OpenAI GPT-5.5 with reasoning effort low when OPENAI_API_KEY is present.
+  - set ZIRP_PROVIDER/ZIRP_MODEL/ZIRP_REASONING_EFFORT or pass flags to override.
+  - if no configured API key is found, ask prints the prompt.`);
 }
 
 async function main() {
@@ -106,6 +118,7 @@ async function main() {
 
 	const includeJournal = cli.flags.has("include-journal");
 	const forceMemory = cli.flags.has("memory");
+	const modelConfig = getModelConfig(cli);
 	const requestedLimit = Number(cli.values.get("limit") ?? 8);
 	const limit = Number.isFinite(requestedLimit) ? requestedLimit : 8;
 	const query = cli.positionals.slice(1).join(" ").trim();
@@ -155,13 +168,13 @@ async function main() {
 	}
 
 	if (command === "ask") {
-		const responseText = await ask(query, hits);
+		const responseText = await ask(query, hits, modelConfig);
 		recordZirpRun(
 			"ask",
 			query,
 			hits,
 			responseText,
-			process.env.ANTHROPIC_API_KEY ? DEFAULT_MODEL : undefined,
+			formatModelLabel(modelConfig),
 		);
 		return;
 	}
@@ -192,6 +205,51 @@ function parseCliArgs(args: string[]) {
 	}
 
 	return { flags, values, positionals };
+}
+
+function getModelConfig(cli: ReturnType<typeof parseCliArgs>): ModelConfig {
+	const provider = normalizeProvider(
+		cli.values.get("provider") ?? process.env.ZIRP_PROVIDER,
+	);
+	const model = normalizeModelName(
+		cli.values.get("model") ??
+			process.env.ZIRP_MODEL ??
+			(provider === "openai" ? DEFAULT_OPENAI_MODEL : DEFAULT_ANTHROPIC_MODEL),
+	);
+	const reasoningEffort = normalizeReasoningEffort(
+		cli.values.get("reasoning-effort") ??
+			process.env.ZIRP_REASONING_EFFORT ??
+			DEFAULT_REASONING_EFFORT,
+	);
+	return { provider, model, reasoningEffort };
+}
+
+function normalizeProvider(value?: string): ZirpProvider {
+	if (value === "anthropic") return "anthropic";
+	if (value === "openai") return "openai";
+	return process.env.OPENAI_API_KEY ? "openai" : "anthropic";
+}
+
+function normalizeModelName(model: string) {
+	if (["5.5", "gpt55", "gpt-55"].includes(model.toLowerCase())) {
+		return "gpt-5.5";
+	}
+	return model;
+}
+
+function normalizeReasoningEffort(
+	value: string,
+): ModelConfig["reasoningEffort"] {
+	if (["minimal", "low", "medium", "high"].includes(value)) {
+		return value as ModelConfig["reasoningEffort"];
+	}
+	return DEFAULT_REASONING_EFFORT;
+}
+
+function formatModelLabel(config: ModelConfig) {
+	return config.provider === "openai"
+		? `${config.provider}:${config.model}:reasoning=${config.reasoningEffort}`
+		: `${config.provider}:${config.model}`;
 }
 
 function loadCorpus(includeJournal: boolean) {
@@ -952,15 +1010,93 @@ function readPersona(file: string) {
 	return existsSync(path) ? readFileSync(path, "utf8") : "";
 }
 
-async function ask(query: string, hits: SearchHit[]) {
-	const prompt = buildPrompt(query, hits);
-	const apiKey = process.env.ANTHROPIC_API_KEY;
+type OpenAIResponse = {
+	output_text?: string;
+	output?: {
+		content?: { text?: string; type?: string }[];
+	}[];
+};
 
-	if (!apiKey) {
-		console.log("ANTHROPIC_API_KEY not found. Printing prompt instead.\n");
+function extractOpenAIText(body: OpenAIResponse) {
+	if (body.output_text) return body.output_text;
+	return (
+		body.output
+			?.flatMap((item) => item.content ?? [])
+			.map((content) => content.text)
+			.filter(Boolean)
+			.join("\n") ?? ""
+	);
+}
+
+async function ask(query: string, hits: SearchHit[], modelConfig: ModelConfig) {
+	const prompt = buildPrompt(query, hits);
+	const responseText = await callModel(prompt, modelConfig);
+
+	if (!responseText) {
+		console.log(
+			`No API key found for ${modelConfig.provider}. Printing prompt instead.\n`,
+		);
 		console.log(formatPrompt(prompt.system, prompt.user));
 		return "";
 	}
+
+	console.log(responseText);
+	console.log("\nSources:");
+	for (const [index, hit] of hits.entries()) {
+		console.log(`${index + 1}. ${hit.title} — ${hit.sourcePath}`);
+	}
+	return responseText;
+}
+
+async function callModel(
+	prompt: { system: string; user: string },
+	modelConfig: ModelConfig,
+) {
+	if (modelConfig.provider === "openai") {
+		return callOpenAI(prompt, modelConfig);
+	}
+	return callAnthropic(prompt, modelConfig);
+}
+
+async function callOpenAI(
+	prompt: { system: string; user: string },
+	modelConfig: ModelConfig,
+) {
+	const apiKey = process.env.OPENAI_API_KEY;
+	if (!apiKey) return "";
+
+	const response = await fetch("https://api.openai.com/v1/responses", {
+		method: "POST",
+		headers: {
+			authorization: `Bearer ${apiKey}`,
+			"content-type": "application/json",
+		},
+		body: JSON.stringify({
+			model: modelConfig.model,
+			max_output_tokens: 900,
+			reasoning: { effort: modelConfig.reasoningEffort },
+			input: [
+				{ role: "system", content: prompt.system },
+				{ role: "user", content: prompt.user },
+			],
+		}),
+	});
+
+	if (!response.ok) {
+		const body = await response.text();
+		throw new Error(`OpenAI request failed: ${response.status} ${body}`);
+	}
+
+	const body = (await response.json()) as OpenAIResponse;
+	return extractOpenAIText(body);
+}
+
+async function callAnthropic(
+	prompt: { system: string; user: string },
+	modelConfig: ModelConfig,
+) {
+	const apiKey = process.env.ANTHROPIC_API_KEY;
+	if (!apiKey) return "";
 
 	const response = await fetch("https://api.anthropic.com/v1/messages", {
 		method: "POST",
@@ -970,7 +1106,7 @@ async function ask(query: string, hits: SearchHit[]) {
 			"x-api-key": apiKey,
 		},
 		body: JSON.stringify({
-			model: DEFAULT_MODEL,
+			model: modelConfig.model,
 			max_tokens: 900,
 			system: prompt.system,
 			messages: [{ role: "user", content: prompt.user }],
@@ -983,17 +1119,12 @@ async function ask(query: string, hits: SearchHit[]) {
 	}
 
 	const body = (await response.json()) as { content?: { text?: string }[] };
-	const responseText =
+	return (
 		body.content
 			?.map((part) => part.text)
 			.filter(Boolean)
-			.join("\n") ?? "";
-	console.log(responseText);
-	console.log("\nSources:");
-	for (const [index, hit] of hits.entries()) {
-		console.log(`${index + 1}. ${hit.title} — ${hit.sourcePath}`);
-	}
-	return responseText;
+			.join("\n") ?? ""
+	);
 }
 
 function formatPrompt(system: string, user: string) {

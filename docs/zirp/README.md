@@ -45,6 +45,7 @@ The goal is not to build a generic chatbot. The goal is to make the corpus query
 - `docs/zirp/LEXICON.md` — seed glossary of recurring personal concepts.
 - `docs/zirp/ARCHITECTURE.md` — technical architecture and corpus tiering.
 - `docs/zirp/SQLITE_PLAN.md` — follow-up plan for namespaced ZIRP tables in the existing SQLite DB.
+- `docs/zirp/DX.md` — daily-use walkthrough, model config, golden queries, and troubleshooting.
 
 ## Commands
 
@@ -58,7 +59,13 @@ bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
 ```
 
-`ask` uses `ANTHROPIC_API_KEY` when present. If no key is configured, it prints the generated prompt so it can be pasted into any model.
+`ask` defaults to OpenAI `gpt-5.5` with reasoning effort `low` when `OPENAI_API_KEY` is present. If OpenAI is not configured, it falls back to Anthropic when `ANTHROPIC_API_KEY` is present. If no key is configured, it prints the generated prompt so it can be pasted into any model.
+
+Override per command:
+
+```bash
+bun zirp ask "what should I write next?" --provider openai --model gpt-5.5 --reasoning-effort low
+```
 
 ## Corpus tiers
 
@@ -77,7 +84,7 @@ bun zirp ask "what should I write next?"
 - Legal/data archive folders are not crawled.
 - Existing `data/knowledge.db` is opened read-only/immutable.
 - The CLI never modifies source notes.
-- Network calls only happen in `ask`, and only when `ANTHROPIC_API_KEY` exists.
+- Network calls only happen in `ask`, and only when `OPENAI_API_KEY` or `ANTHROPIC_API_KEY` exists.
 
 ## Current limits
 

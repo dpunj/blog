@@ -102,9 +102,9 @@ bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
 ```
 
-Privacy defaults: `journal/` is excluded unless `--include-journal` is passed; API calls only happen when `ANTHROPIC_API_KEY` exists.
+Privacy defaults: `journal/` is excluded unless `--include-journal` is passed; API calls only happen when a model API key is configured. `ask` defaults to OpenAI `gpt-5.5` with reasoning effort `low` when `OPENAI_API_KEY` is present, with Anthropic fallback.
 
-See `docs/zirp/README.md` and `docs/zirp/ARCHITECTURE.md`.
+See `docs/zirp/README.md`, `docs/zirp/DX.md`, and `docs/zirp/ARCHITECTURE.md`.
 
 ## Content
 

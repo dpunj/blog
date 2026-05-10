@@ -48,7 +48,7 @@ bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
 ```
 
-`ask` calls Anthropic only if `ANTHROPIC_API_KEY` is present. Otherwise it prints the composed prompt for copy/paste into any model.
+`ask` defaults to OpenAI `gpt-5.5` with reasoning effort `low` when `OPENAI_API_KEY` is present. If OpenAI is not configured, it falls back to Anthropic when `ANTHROPIC_API_KEY` is present. Otherwise it prints the composed prompt for copy/paste into any model.
 
 ## Privacy defaults
 
