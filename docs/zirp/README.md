@@ -39,7 +39,7 @@ The goal is not to build a generic chatbot. The goal is to make the corpus query
 
 ## What shipped in v0
 
-- `scripts/zirp.ts` — a Bun CLI for local corpus inventory, search, prompt-building, and optional LLM answers.
+- `scripts/zirp.ts` — a Bun CLI for local corpus inventory, SQLite indexing, search, prompt-building, and optional LLM answers.
 - `docs/zirp/SOUL.md` — seed worldview/persona document.
 - `docs/zirp/STYLE.md` — seed writing/answer style guide.
 - `docs/zirp/LEXICON.md` — seed glossary of recurring personal concepts.
@@ -50,6 +50,9 @@ The goal is not to build a generic chatbot. The goal is to make the corpus query
 
 ```bash
 bun zirp inventory
+bun zirp init-db
+bun zirp index
+bun zirp stats
 bun zirp search "games as training grounds"
 bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
@@ -78,6 +81,6 @@ bun zirp ask "what should I write next?"
 
 ## Current limits
 
-v0 retrieval is weighted lexical search, not embeddings. This is good enough to make the thing real, but it will miss semantically related sources that do not share words with the query.
+Current retrieval is SQLite FTS5 plus lexical re-ranking, not embeddings. This is good enough to make the thing durable and inspectable, but it will still miss semantically related sources that do not share words with the query.
 
-The next obvious move is a SQLite-backed ZIRP index using separate `zirp_*` tables inside the existing `data/knowledge.db`: normalized sources, chunks, retrieval runs, and eventually embeddings. See `SQLITE_PLAN.md`.
+The next obvious move is embeddings on top of the existing `zirp_*` tables. See `SQLITE_PLAN.md`.

@@ -135,7 +135,7 @@ CREATE TABLE IF NOT EXISTS zirp_exclusions (
 );
 ```
 
-## Commands to add
+## Commands
 
 ```bash
 bun zirp init-db                 # creates zirp_* tables in data/knowledge.db
@@ -201,11 +201,20 @@ No source library data is touched.
 - Should Readwise highlights/full text be pulled into `zirp_chunks`, or should v1 stay metadata-only?
 - Should `SOUL.md` and `STYLE.md` be regenerated from stored chunks on demand?
 
-## Recommendation
+## Status
 
-Build SQLite v1 in two steps:
+Implemented:
 
-1. **FTS5-only `zirp_*` tables inside `data/knowledge.db`**: source/chunk tables, hashing, indexing, search, run logging.
-2. **Semantic layer**: embeddings once the ingestion/indexing shape feels right.
+- `bun zirp init-db`
+- `bun zirp index`
+- `bun zirp stats`
+- FTS5-backed `search`/`prompt`/`ask` with `--memory` fallback
+- run logging in `zirp_runs` and `zirp_run_sources`
 
-That gives us one inspectable local brain without mixing source-of-truth sync data and generated oracle index data.
+Still next:
+
+1. Add embeddings / semantic search once the FTS5 ingestion shape feels right.
+2. Add smarter source curation and exclusion management.
+3. Consider regenerating `SOUL.md` and `STYLE.md` from indexed chunks.
+
+This gives us one inspectable local brain without mixing source-of-truth sync data and generated oracle index data.

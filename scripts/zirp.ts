@@ -1,11 +1,13 @@
 #!/usr/bin/env bun
 
 import { Database } from "bun:sqlite";
+import { createHash, randomUUID } from "node:crypto";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { basename, extname, join, relative, resolve } from "node:path";
 
 const BLOG_ROOT = resolve(import.meta.dir, "..");
 const NOTES_ROOT = process.env.NOTES_ROOT ?? "/Users/dpunj/notes";
+const KNOWLEDGE_DB_PATH = join(BLOG_ROOT, "data/knowledge.db");
 const DEFAULT_MODEL = process.env.ZIRP_MODEL ?? "claude-haiku-4-5-20251001";
 
 type CorpusTier =
@@ -80,12 +82,16 @@ function usage() {
 
 Commands:
   bun zirp inventory [--include-journal]
-  bun zirp search <query> [--limit 8] [--include-journal]
-  bun zirp prompt <query> [--include-journal]
-  bun zirp ask <query> [--include-journal]
+  bun zirp init-db
+  bun zirp index [--include-journal]
+  bun zirp stats
+  bun zirp search <query> [--limit 8] [--include-journal] [--memory]
+  bun zirp prompt <query> [--include-journal] [--memory]
+  bun zirp ask <query> [--include-journal] [--memory]
 
 Notes:
   - journal/ is excluded unless --include-journal is passed.
+  - search/prompt/ask prefer the SQLite index when available; use --memory to force v0 in-memory search.
   - ask uses ANTHROPIC_API_KEY if present; otherwise it prints the prompt.`);
 }
 
@@ -99,13 +105,32 @@ async function main() {
 	}
 
 	const includeJournal = cli.flags.has("include-journal");
+	const forceMemory = cli.flags.has("memory");
 	const requestedLimit = Number(cli.values.get("limit") ?? 8);
 	const limit = Number.isFinite(requestedLimit) ? requestedLimit : 8;
 	const query = cli.positionals.slice(1).join(" ").trim();
 
-	const docs = loadCorpus(includeJournal);
+	if (command === "init-db") {
+		initZirpDb();
+		console.log(
+			`Initialized zirp_* tables in ${relative(BLOG_ROOT, KNOWLEDGE_DB_PATH)}`,
+		);
+		return;
+	}
+
+	if (command === "index") {
+		const docs = loadCorpus(includeJournal);
+		indexCorpus(docs, includeJournal);
+		return;
+	}
+
+	if (command === "stats") {
+		printZirpStats();
+		return;
+	}
 
 	if (command === "inventory") {
+		const docs = loadCorpus(includeJournal);
 		printInventory(docs, includeJournal);
 		return;
 	}
@@ -114,19 +139,30 @@ async function main() {
 		throw new Error(`Missing query for '${command}'`);
 	}
 
+	const hits = search(query, limit, includeJournal, forceMemory);
+
 	if (command === "search") {
-		printHits(searchCorpus(query, docs, limit));
+		recordZirpRun("search", query, hits);
+		printHits(hits);
 		return;
 	}
 
 	if (command === "prompt") {
-		const prompt = buildPrompt(query, searchCorpus(query, docs, limit));
+		const prompt = buildPrompt(query, hits);
+		recordZirpRun("prompt", query, hits);
 		console.log(formatPrompt(prompt.system, prompt.user));
 		return;
 	}
 
 	if (command === "ask") {
-		await ask(query, docs, limit);
+		const responseText = await ask(query, hits);
+		recordZirpRun(
+			"ask",
+			query,
+			hits,
+			responseText,
+			process.env.ANTHROPIC_API_KEY ? DEFAULT_MODEL : undefined,
+		);
 		return;
 	}
 
@@ -167,6 +203,430 @@ function loadCorpus(includeJournal: boolean) {
 	docs.push(...loadGoodreadsDocs());
 	docs.push(...loadSpotifyDocs());
 	return docs.filter((doc) => doc.text.trim().length > 0);
+}
+
+function search(
+	query: string,
+	limit: number,
+	includeJournal: boolean,
+	forceMemory: boolean,
+) {
+	if (!forceMemory && hasZirpIndex()) {
+		const indexedHits = searchIndexedCorpus(query, limit);
+		if (indexedHits.length > 0) return indexedHits;
+	}
+
+	return searchCorpus(query, loadCorpus(includeJournal), limit);
+}
+
+function initZirpDb() {
+	const db = openKnowledgeDb();
+	db.run("PRAGMA foreign_keys = ON");
+	runSqlScript(
+		db,
+		`
+		CREATE TABLE IF NOT EXISTS zirp_sources (
+			id TEXT PRIMARY KEY,
+			source_type TEXT NOT NULL,
+			tier TEXT NOT NULL,
+			title TEXT NOT NULL,
+			source_path TEXT NOT NULL,
+			url TEXT,
+			author TEXT,
+			source_hash TEXT NOT NULL,
+			upstream_resource_id TEXT REFERENCES resources(id) ON DELETE SET NULL,
+			metadata_json TEXT,
+			indexed_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE TABLE IF NOT EXISTS zirp_chunks (
+			id TEXT PRIMARY KEY,
+			source_id TEXT NOT NULL REFERENCES zirp_sources(id) ON DELETE CASCADE,
+			chunk_index INTEGER NOT NULL,
+			text TEXT NOT NULL,
+			token_count INTEGER,
+			weight REAL NOT NULL DEFAULT 1.0,
+			metadata_json TEXT,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP,
+			UNIQUE(source_id, chunk_index)
+		);
+
+		CREATE VIRTUAL TABLE IF NOT EXISTS zirp_chunks_fts USING fts5(
+			title,
+			text,
+			source_id UNINDEXED,
+			chunk_id UNINDEXED,
+			tier UNINDEXED,
+			tokenize = 'porter unicode61'
+		);
+
+		CREATE TABLE IF NOT EXISTS zirp_embeddings (
+			chunk_id TEXT PRIMARY KEY REFERENCES zirp_chunks(id) ON DELETE CASCADE,
+			model TEXT NOT NULL,
+			dimensions INTEGER NOT NULL,
+			embedding BLOB NOT NULL,
+			embedded_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE TABLE IF NOT EXISTS zirp_runs (
+			id TEXT PRIMARY KEY,
+			query TEXT NOT NULL,
+			mode TEXT NOT NULL,
+			model TEXT,
+			response_text TEXT,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE TABLE IF NOT EXISTS zirp_run_sources (
+			run_id TEXT NOT NULL REFERENCES zirp_runs(id) ON DELETE CASCADE,
+			chunk_id TEXT NOT NULL REFERENCES zirp_chunks(id) ON DELETE CASCADE,
+			rank INTEGER NOT NULL,
+			score REAL NOT NULL,
+			PRIMARY KEY (run_id, chunk_id)
+		);
+
+		CREATE TABLE IF NOT EXISTS zirp_exclusions (
+			path_glob TEXT PRIMARY KEY,
+			reason TEXT,
+			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+		);
+
+		CREATE INDEX IF NOT EXISTS idx_zirp_sources_tier ON zirp_sources(tier);
+		CREATE INDEX IF NOT EXISTS idx_zirp_sources_type ON zirp_sources(source_type);
+		CREATE INDEX IF NOT EXISTS idx_zirp_chunks_source ON zirp_chunks(source_id);
+	`,
+	);
+	db.close();
+}
+
+function indexCorpus(docs: ZirpDoc[], includeJournal: boolean) {
+	initZirpDb();
+	const db = openKnowledgeDb();
+	db.run("PRAGMA foreign_keys = ON");
+
+	const insertSource = db.prepare(`
+		INSERT INTO zirp_sources (
+			id, source_type, tier, title, source_path, url, author, source_hash,
+			upstream_resource_id, metadata_json, indexed_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`);
+	const insertChunk = db.prepare(`
+		INSERT INTO zirp_chunks (
+			id, source_id, chunk_index, text, token_count, weight, metadata_json, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`);
+	const insertFts = db.prepare(`
+		INSERT INTO zirp_chunks_fts (title, text, source_id, chunk_id, tier)
+		VALUES (?, ?, ?, ?, ?)
+	`);
+
+	const rebuild = db.transaction((records: ZirpDoc[]) => {
+		db.run("DELETE FROM zirp_run_sources");
+		db.run("DELETE FROM zirp_embeddings");
+		db.run("DELETE FROM zirp_chunks_fts");
+		db.run("DELETE FROM zirp_chunks");
+		db.run("DELETE FROM zirp_sources");
+
+		let chunkCount = 0;
+		for (const doc of records) {
+			const sourceType = inferSourceType(doc);
+			const upstreamResourceId = doc.id.startsWith("library:")
+				? doc.id.slice("library:".length)
+				: null;
+			insertSource.run(
+				doc.id,
+				sourceType,
+				doc.tier,
+				doc.title,
+				doc.sourcePath,
+				doc.sourcePath.startsWith("http") ? doc.sourcePath : null,
+				doc.metadata?.author ?? null,
+				hashDoc(doc),
+				upstreamResourceId,
+				JSON.stringify({ kind: doc.kind, weight: doc.weight, ...doc.metadata }),
+			);
+
+			const chunks = chunkText(doc.text);
+			for (const [chunkIndex, chunk] of chunks.entries()) {
+				const chunkId = `${doc.id}#${chunkIndex}`;
+				insertChunk.run(
+					chunkId,
+					doc.id,
+					chunkIndex,
+					chunk,
+					tokenize(chunk).length,
+					doc.weight,
+					JSON.stringify({ kind: doc.kind }),
+				);
+				insertFts.run(doc.title, chunk, doc.id, chunkId, doc.tier);
+				chunkCount += 1;
+			}
+		}
+		return chunkCount;
+	});
+
+	const chunkCount = rebuild(docs);
+	db.run("PRAGMA wal_checkpoint(FULL)");
+	db.close();
+	console.log(
+		`Indexed ${docs.length.toLocaleString()} sources into ${chunkCount.toLocaleString()} chunks.`,
+	);
+	console.log(`journal included: ${includeJournal ? "yes" : "no"}`);
+}
+
+function hasZirpIndex() {
+	if (!existsSync(KNOWLEDGE_DB_PATH)) return false;
+	try {
+		const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+			readonly: true,
+		});
+		const row = db
+			.query(
+				"SELECT count(*) AS count FROM sqlite_master WHERE name = 'zirp_chunks'",
+			)
+			.get() as { count: number };
+		if (row.count === 0) {
+			db.close();
+			return false;
+		}
+		const chunks = db
+			.query("SELECT count(*) AS count FROM zirp_chunks")
+			.get() as { count: number };
+		db.close();
+		return chunks.count > 0;
+	} catch {
+		return false;
+	}
+}
+
+function searchIndexedCorpus(query: string, limit: number): SearchHit[] {
+	const ftsQuery = buildFtsQuery(query);
+	if (!ftsQuery) return [];
+
+	const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+		readonly: true,
+	});
+	try {
+		const rows = db
+			.query(`
+				SELECT
+					c.id AS chunk_id,
+					c.text AS text,
+					c.weight AS weight,
+					s.id AS source_id,
+					s.title AS title,
+					s.source_path AS source_path,
+					s.tier AS tier,
+					s.source_type AS source_type,
+					bm25(zirp_chunks_fts) AS rank
+				FROM zirp_chunks_fts
+				JOIN zirp_chunks c ON c.id = zirp_chunks_fts.chunk_id
+				JOIN zirp_sources s ON s.id = c.source_id
+				WHERE zirp_chunks_fts MATCH ?
+				ORDER BY rank
+				LIMIT ?
+			`)
+			.all(ftsQuery, Math.max(limit * 100, 500)) as Record<
+			string,
+			string | number | null
+		>[];
+
+		const queryTokens = tokenize(query);
+		const hits = rows
+			.map((row) => {
+				const doc = {
+					id: String(row.source_id),
+					title: String(row.title),
+					text: String(row.text),
+					sourcePath: String(row.source_path),
+					tier: row.tier as CorpusTier,
+					kind: String(row.source_type),
+					weight: Number(row.weight),
+					metadata: { chunkId: String(row.chunk_id) },
+				};
+				const lexicalScore = scoreDoc(
+					queryTokens,
+					query.toLowerCase(),
+					tokenize(doc.title),
+					tokenize(doc.text),
+					doc,
+				);
+				const rankBoost = 1 / (1 + Math.abs(Number(row.rank)));
+				return {
+					...doc,
+					score: lexicalScore + rankBoost,
+					snippet: makeSnippet(doc.text, queryTokens),
+				};
+			})
+			.filter((hit) => hit.score > 0)
+			.sort((a, b) => b.score - a.score);
+		return dedupeHitsBySource(hits).slice(0, limit);
+	} finally {
+		db.close();
+	}
+}
+
+function dedupeHitsBySource(hits: SearchHit[]) {
+	const seen = new Set<string>();
+	const deduped: SearchHit[] = [];
+	for (const hit of hits) {
+		if (seen.has(hit.id)) continue;
+		seen.add(hit.id);
+		deduped.push(hit);
+	}
+	return deduped;
+}
+
+function recordZirpRun(
+	mode: "search" | "prompt" | "ask",
+	query: string,
+	hits: SearchHit[],
+	responseText?: string,
+	model?: string,
+) {
+	if (!hasZirpTables()) return;
+
+	const indexedHits = hits.filter((hit) => hit.metadata?.chunkId);
+	const db = openKnowledgeDb();
+	const insertRun = db.prepare(`
+		INSERT INTO zirp_runs (id, query, mode, model, response_text, created_at)
+		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+	`);
+	const insertRunSource = db.prepare(`
+		INSERT INTO zirp_run_sources (run_id, chunk_id, rank, score)
+		VALUES (?, ?, ?, ?)
+	`);
+
+	const write = db.transaction(() => {
+		const runId = randomUUID();
+		insertRun.run(runId, query, mode, model ?? null, responseText ?? null);
+		for (const [index, hit] of indexedHits.entries()) {
+			insertRunSource.run(
+				runId,
+				String(hit.metadata?.chunkId),
+				index + 1,
+				hit.score,
+			);
+		}
+	});
+
+	write();
+	db.close();
+}
+
+function printZirpStats() {
+	if (!existsSync(KNOWLEDGE_DB_PATH)) {
+		console.log("data/knowledge.db not found");
+		return;
+	}
+	if (!hasZirpTables()) {
+		console.log("zirp_* tables not initialized. Run `bun zirp init-db`.");
+		return;
+	}
+
+	const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+		readonly: true,
+	});
+	try {
+		const sources = db
+			.query("SELECT count(*) AS count FROM zirp_sources")
+			.get() as { count: number };
+		const chunks = db
+			.query("SELECT count(*) AS count FROM zirp_chunks")
+			.get() as { count: number };
+		const runs = db.query("SELECT count(*) AS count FROM zirp_runs").get() as {
+			count: number;
+		};
+		console.log(`zirp sources: ${sources.count.toLocaleString()}`);
+		console.log(`zirp chunks:  ${chunks.count.toLocaleString()}`);
+		console.log(`zirp runs:    ${runs.count.toLocaleString()}\n`);
+
+		const tiers = db
+			.query(`
+				SELECT s.tier AS tier, s.source_type AS source_type, count(*) AS count
+				FROM zirp_sources s
+				GROUP BY s.tier, s.source_type
+				ORDER BY count DESC
+			`)
+			.all() as { tier: string; source_type: string; count: number }[];
+		for (const row of tiers) {
+			console.log(
+				`${`${row.tier}/${row.source_type}`.padEnd(28)} ${row.count}`,
+			);
+		}
+	} finally {
+		db.close();
+	}
+}
+
+function hasZirpTables() {
+	try {
+		const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+			readonly: true,
+		});
+		const row = db
+			.query(
+				"SELECT count(*) AS count FROM sqlite_master WHERE name = 'zirp_sources'",
+			)
+			.get() as { count: number };
+		db.close();
+		return row.count > 0;
+	} catch {
+		return false;
+	}
+}
+
+function openKnowledgeDb() {
+	if (!existsSync(KNOWLEDGE_DB_PATH)) {
+		throw new Error(
+			"data/knowledge.db not found. Run the sync pipeline first.",
+		);
+	}
+	return new Database(KNOWLEDGE_DB_PATH);
+}
+
+function runSqlScript(db: Database, sql: string) {
+	for (const statement of sql.split(";")) {
+		const trimmed = statement.trim();
+		if (trimmed) db.run(trimmed);
+	}
+}
+
+function inferSourceType(doc: ZirpDoc) {
+	if (doc.id.startsWith("library:"))
+		return String(doc.metadata?.source ?? "library");
+	if (doc.id.startsWith("goodreads:")) return "goodreads";
+	if (doc.id.startsWith("spotify:")) return "spotify";
+	if (doc.tier === "self") return "blog";
+	if (doc.tier === "operator") return "versa";
+	return "note";
+}
+
+function hashDoc(doc: ZirpDoc) {
+	return createHash("sha256")
+		.update([doc.id, doc.title, doc.sourcePath, doc.text].join("\n"))
+		.digest("hex");
+}
+
+function chunkText(text: string, size = 512, overlap = 64) {
+	const words = text.split(/\s+/).filter(Boolean);
+	if (words.length <= size) return [text];
+
+	const chunks: string[] = [];
+	for (let start = 0; start < words.length; start += size - overlap) {
+		chunks.push(words.slice(start, start + size).join(" "));
+		if (start + size >= words.length) break;
+	}
+	return chunks;
+}
+
+function buildFtsQuery(query: string) {
+	const tokens = tokenize(query)
+		.flatMap((token) => token.split(/[^a-z0-9]+/))
+		.filter(Boolean);
+	const uniqueTokens = [...new Set(tokens)];
+	if (uniqueTokens.length === 0) return "";
+	return uniqueTokens.map((token) => `${token}*`).join(" OR ");
 }
 
 function loadBlogDocs() {
@@ -241,11 +701,10 @@ function loadOperatorDocs() {
 }
 
 function loadKnowledgeDbDocs() {
-	const dbPath = join(BLOG_ROOT, "data/knowledge.db");
-	if (!existsSync(dbPath)) return [];
+	if (!existsSync(KNOWLEDGE_DB_PATH)) return [];
 
 	try {
-		const db = new Database(`file:${dbPath}?mode=ro&immutable=1`, {
+		const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
 			readonly: true,
 		});
 		const rows = db
@@ -327,7 +786,7 @@ function loadSpotifyDocs() {
 			const album = track.album?.name ?? "";
 			const title = track.name ?? "Untitled track";
 			return {
-				id: `spotify:${track.id ?? index}`,
+				id: `spotify:${track.id ?? "track"}:${index}`,
 				title: artists ? `${title} by ${artists}` : title,
 				text: [title, artists, album].filter(Boolean).join("\n"),
 				sourcePath: "public/data/wtm.json",
@@ -493,15 +952,14 @@ function readPersona(file: string) {
 	return existsSync(path) ? readFileSync(path, "utf8") : "";
 }
 
-async function ask(query: string, docs: ZirpDoc[], limit: number) {
-	const hits = searchCorpus(query, docs, limit);
+async function ask(query: string, hits: SearchHit[]) {
 	const prompt = buildPrompt(query, hits);
 	const apiKey = process.env.ANTHROPIC_API_KEY;
 
 	if (!apiKey) {
 		console.log("ANTHROPIC_API_KEY not found. Printing prompt instead.\n");
 		console.log(formatPrompt(prompt.system, prompt.user));
-		return;
+		return "";
 	}
 
 	const response = await fetch("https://api.anthropic.com/v1/messages", {
@@ -525,16 +983,17 @@ async function ask(query: string, docs: ZirpDoc[], limit: number) {
 	}
 
 	const body = (await response.json()) as { content?: { text?: string }[] };
-	console.log(
+	const responseText =
 		body.content
 			?.map((part) => part.text)
 			.filter(Boolean)
-			.join("\n") ?? "",
-	);
+			.join("\n") ?? "";
+	console.log(responseText);
 	console.log("\nSources:");
 	for (const [index, hit] of hits.entries()) {
 		console.log(`${index + 1}. ${hit.title} — ${hit.sourcePath}`);
 	}
+	return responseText;
 }
 
 function formatPrompt(system: string, user: string) {
