@@ -1,6 +1,18 @@
 # divesh_zirp DX walkthrough
 
-This is the daily-use runbook for the local oracle.
+This is the canonical daily-use runbook for the local oracle.
+
+## TL;DR
+
+```bash
+bun sync api --export-library  # fetch remote library data, then export site JSON
+bun zirp inventory             # dry-run scan of the live corpus
+bun zirp index                 # rebuild derived zirp_* tables
+bun zirp stats                 # inspect the indexed corpus
+bun zirp serve                 # open local cockpit at http://127.0.0.1:7331
+```
+
+Use `bun zirp -h` for CLI help.
 
 ## Mental model
 
@@ -36,8 +48,8 @@ zirp_exclusions
 ```bash
 cd ~/code/blog
 bun install
-bun sync --export-library   # if data/knowledge.db needs to be regenerated
-bun zirp init-db
+bun sync api --export-library  # if data/knowledge.db needs fresh remote data
+bun zirp init-db               # safe to rerun
 bun zirp index
 bun zirp stats
 ```
@@ -58,28 +70,54 @@ zirp chunks:  ~11k+
 
 Counts will drift as Readwise/Zotero/Spotify/Goodreads change.
 
+## Command semantics
+
+| Command | Reads | Writes | Meaning |
+| --- | --- | --- | --- |
+| `bun sync api --export-library` | Remote APIs | `data/knowledge.db`, `public/data/library.json` | Fetch Readwise/Zotero/etc., then export site JSON. |
+| `bun sync --export-library` | `data/knowledge.db` | `public/data/library.json` | Export current DB to site JSON; no remote fetch. |
+| `bun zirp inventory` | Disk + `data/knowledge.db` | Nothing | Dry-run scan: what ZIRP would index now. |
+| `bun zirp index` | Disk + `data/knowledge.db` | `zirp_*` tables | Rebuild the oracle index. |
+| `bun zirp stats` | `zirp_*` tables | Nothing | Inspect what is currently indexed. |
+| `bun zirp serve` | `zirp_*` tables | `zirp_runs` on use | Local cockpit + SQLite explorer. |
+
+Think:
+
+```txt
+inventory = live corpus preview
+index     = live corpus → zirp_* tables
+stats     = current zirp_* table counts
+```
+
+If `inventory` and `stats` disagree after syncing or editing, run `bun zirp index`.
+
+Notes from real use:
+
+- `bun sync api --export-library` may report fetched/synced API items even when the unique library count barely changes, especially for sources like Letterboxd that refresh recent entries.
+- `bun sync --export-library` only regenerates `public/data/library.json`; it does not fetch remote APIs.
+- `bun zirp inventory` can change whenever disk files or `data/knowledge.db` change. `bun zirp stats` changes only after `bun zirp index`.
+
 ## Daily use
 
-### Inventory the live corpus
+### Refresh remote library data
+
+```bash
+bun sync api --export-library
+bun zirp index
+bun zirp stats
+```
+
+Use this after adding/saving new Readwise/Zotero/Letterboxd/RAWG items.
+
+### Refresh local-only edits
 
 ```bash
 bun zirp inventory
-```
-
-This reads sources directly from disk/DB and shows what would be indexed. It does not require the SQLite ZIRP index.
-
-### Rebuild the index
-
-```bash
 bun zirp index
+bun zirp stats
 ```
 
-Run after:
-
-- editing blog posts;
-- adding notes;
-- syncing Readwise/Zotero;
-- changing Goodreads/Spotify exports.
+Use this after editing blog posts, notes, Goodreads CSV, or Spotify exports.
 
 ### Search sources
 

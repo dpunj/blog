@@ -88,7 +88,7 @@ const STOPWORDS = new Set([
 ]);
 
 function usage() {
-	console.log(`divesh_zirp v0
+	console.log(`divesh_zirp local oracle
 
 Commands:
   bun zirp inventory [--include-journal]
@@ -113,7 +113,14 @@ async function main() {
 	const cli = parseCliArgs(process.argv.slice(2));
 	const command = cli.positionals[0];
 
-	if (!command || command === "help" || command === "--help") {
+	if (
+		!command ||
+		command === "help" ||
+		command === "--help" ||
+		command === "-h" ||
+		cli.flags.has("help") ||
+		cli.flags.has("h")
+	) {
 		usage();
 		return;
 	}
