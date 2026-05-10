@@ -22,21 +22,27 @@
 
 ## Current retrieval
 
-v0 uses weighted lexical retrieval:
+v0 started with in-memory weighted lexical retrieval. v1 adds a local SQLite index using namespaced `zirp_*` tables inside `data/knowledge.db`.
 
-1. Load local corpus records.
-2. Tokenize query and documents.
-3. Score unique and repeated token matches.
-4. Add boosts for title matches and exact phrase matches.
-5. Multiply by source-tier weight.
-6. Return top sources with snippets.
+The indexed path:
 
-This is intentionally crude but useful. v1 should add embeddings with a local SQLite vector extension, LanceDB, or a hosted vector index.
+1. Crawl local corpus records.
+2. Store sources in `zirp_sources`.
+3. Chunk text into `zirp_chunks`.
+4. Mirror searchable text into `zirp_chunks_fts` using SQLite FTS5.
+5. Search FTS5, then re-rank candidates with title/text lexical scoring and tier weights.
+6. Dedupe by source and return top snippets.
+7. Log search/prompt/ask runs in `zirp_runs` and `zirp_run_sources` when indexed chunks are used.
+
+Use `--memory` to force the original in-memory search path.
 
 ## Commands
 
 ```bash
 bun zirp inventory
+bun zirp init-db
+bun zirp index
+bun zirp stats
 bun zirp search "games as training grounds"
 bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
@@ -48,7 +54,9 @@ bun zirp ask "what should I write next?"
 
 - Does not index `journal/` unless `--include-journal` is passed.
 - Does not modify notes or source data.
-- Reads `~/code/blog/data/knowledge.db` in immutable read-only mode.
+- Writes only derived `zirp_*` tables inside `~/code/blog/data/knowledge.db` for indexing/run logs.
+- Keeps existing source-of-truth tables (`resources`, `tags`, `resource_tags`, `sync_state`) untouched.
+- Search/prompt/ask read the SQLite index when available; `--memory` bypasses it.
 - API calls are opt-in via environment variables.
 
 ## v1 upgrades

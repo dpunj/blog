@@ -15,6 +15,8 @@ Personal blog built with [Astro](https://astro.build).
 | `bun sync api --export-library` | Sync Readwise/Zotero/etc. and export `/library` data |
 | `bun sync --stats` | Show local knowledge DB stats |
 | `bun zirp inventory` | Inventory the local `divesh_zirp` corpus |
+| `bun zirp init-db` | Create namespaced `zirp_*` tables in `data/knowledge.db` |
+| `bun zirp index` | Build the local SQLite/FTS oracle index |
 | `bun zirp search "games as training grounds"` | Search the personal oracle corpus |
 | `bun zirp ask "what should I write next?"` | Ask the oracle; uses Anthropic if configured, otherwise prints the prompt |
 
@@ -92,6 +94,9 @@ A local-first personal oracle inspired by `vgr_zirp`. It retrieves from blog pos
 
 ```bash
 bun zirp inventory
+bun zirp init-db
+bun zirp index
+bun zirp stats
 bun zirp search "games as training grounds"
 bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
