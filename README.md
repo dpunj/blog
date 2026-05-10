@@ -17,7 +17,7 @@ Personal blog built with [Astro](https://astro.build).
 | `bun zirp inventory` | Inventory the local `divesh_zirp` corpus |
 | `bun zirp init-db` | Create namespaced `zirp_*` tables in `data/knowledge.db` |
 | `bun zirp index` | Build the local SQLite/FTS oracle index |
-| `bun zirp serve` | Open the local `divesh_zirp` web cockpit on `127.0.0.1:7331` |
+| `bun zirp serve` | Open the local `divesh_zirp` web cockpit + SQLite explorer on `127.0.0.1:7331` |
 | `bun zirp search "games as training grounds"` | Search the personal oracle corpus |
 | `bun zirp ask "what should I write next?"` | Ask the oracle; uses Anthropic if configured, otherwise prints the prompt |
 
@@ -99,6 +99,7 @@ bun zirp init-db
 bun zirp index
 bun zirp stats
 bun zirp serve
+bun zirp datasette
 bun zirp search "games as training grounds"
 bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"

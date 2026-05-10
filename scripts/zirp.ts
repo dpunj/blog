@@ -645,6 +645,20 @@ function serveZirp(options: ServeOptions) {
 				if (url.pathname === "/") return htmlResponse(renderZirpUi(options));
 				if (url.pathname === "/api/stats") return jsonResponse(getZirpStats());
 				if (url.pathname === "/api/runs") return jsonResponse(getRecentRuns());
+				if (url.pathname === "/api/db/tables")
+					return jsonResponse(getDbTables());
+				if (url.pathname === "/api/db/table") {
+					return jsonResponse(
+						getDbTableRows(
+							String(url.searchParams.get("name") ?? ""),
+							Number(url.searchParams.get("limit") ?? 50),
+						),
+					);
+				}
+				if (url.pathname === "/api/db/query" && request.method === "POST") {
+					const body = await readJsonBody(request);
+					return jsonResponse(runReadOnlySql(String(body.sql ?? "")));
+				}
 				if (url.pathname === "/api/search" && request.method === "POST") {
 					const body = await readJsonBody(request);
 					const query = String(body.query ?? "").trim();
@@ -823,6 +837,114 @@ function getRecentRuns() {
 	}
 }
 
+function getDbTables() {
+	if (!existsSync(KNOWLEDGE_DB_PATH)) return { tables: [] };
+	const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+		readonly: true,
+	});
+	try {
+		const tables = db
+			.query(`
+				SELECT name
+				FROM sqlite_master
+				WHERE type = 'table'
+					AND name NOT LIKE 'sqlite_%'
+					AND name NOT LIKE 'zirp_chunks_fts_%'
+				ORDER BY name
+			`)
+			.all() as { name: string }[];
+		return {
+			tables: tables.map((table) => ({
+				name: table.name,
+				count: getTableCount(db, table.name),
+			})),
+		};
+	} finally {
+		db.close();
+	}
+}
+
+function getTableCount(db: Database, tableName: string) {
+	try {
+		assertSafeIdentifier(tableName);
+		const row = db
+			.query(`SELECT count(*) AS count FROM "${tableName}"`)
+			.get() as {
+			count: number;
+		};
+		return row.count;
+	} catch {
+		return null;
+	}
+}
+
+function getDbTableRows(tableName: string, limitValue: number) {
+	assertSafeIdentifier(tableName);
+	const limit = Math.max(
+		1,
+		Math.min(200, Number.isFinite(limitValue) ? limitValue : 50),
+	);
+	const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+		readonly: true,
+	});
+	try {
+		const rows = db
+			.query(`SELECT * FROM "${tableName}" LIMIT ?`)
+			.all(limit) as Record<string, unknown>[];
+		const columns = db.query(`PRAGMA table_info("${tableName}")`).all() as {
+			name: string;
+			type: string;
+		}[];
+		return { table: tableName, columns, rows: serializeRows(rows) };
+	} finally {
+		db.close();
+	}
+}
+
+function runReadOnlySql(sql: string) {
+	const trimmed = sql.trim();
+	if (!isReadOnlySql(trimmed)) {
+		throw new Error(
+			"Only single SELECT/WITH/PRAGMA read-only queries are allowed.",
+		);
+	}
+	const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+		readonly: true,
+	});
+	try {
+		const rows = db.query(trimmed).all() as Record<string, unknown>[];
+		return { rows: serializeRows(rows.slice(0, 200)) };
+	} finally {
+		db.close();
+	}
+}
+
+function isReadOnlySql(sql: string) {
+	const normalized = sql.replace(/--.*$/gm, "").trim().toLowerCase();
+	if (!normalized) return false;
+	if (normalized.slice(0, -1).includes(";")) return false;
+	return /^(select|with|pragma)\b/.test(normalized);
+}
+
+function assertSafeIdentifier(identifier: string) {
+	if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(identifier)) {
+		throw new Error(`Unsafe table name: ${identifier}`);
+	}
+}
+
+function serializeRows(rows: Record<string, unknown>[]) {
+	return rows.map((row) =>
+		Object.fromEntries(
+			Object.entries(row).map(([key, value]) => [
+				key,
+				value instanceof Uint8Array
+					? `[blob ${value.byteLength} bytes]`
+					: value,
+			]),
+		),
+	);
+}
+
 function htmlResponse(html: string) {
 	return new Response(html, {
 		headers: { "content-type": "text/html; charset=utf-8" },
@@ -876,6 +998,14 @@ function renderZirpUi(options: ServeOptions) {
 		.error { color: var(--danger); margin-top: 10px; }
 		.run { border-top: 1px solid var(--line); padding: 10px 0; }
 		.run:first-child { border-top: 0; }
+		.table-list { display: grid; gap: 8px; }
+		.table-button { width: 100%; text-align: left; display: flex; justify-content: space-between; gap: 8px; }
+		.sql { min-height: 72px; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+		.table-wrap { max-height: 460px; overflow: auto; border: 1px solid var(--line); border-radius: 14px; margin-top: 10px; }
+		table { width: 100%; border-collapse: collapse; font-size: 12px; }
+		th, td { border-bottom: 1px solid var(--line); padding: 8px; text-align: left; vertical-align: top; }
+		th { position: sticky; top: 0; background: var(--panel-2); color: var(--muted); }
+		td { max-width: 360px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 		@media (max-width: 880px) { .header, .grid { display: block; } .controls { grid-template-columns: 1fr; } .card { margin-top: 16px; } }
 	</style>
 </head>
@@ -912,14 +1042,24 @@ function renderZirpUi(options: ServeOptions) {
 					<button id="prompt">Prompt</button>
 					<button id="clear">Clear</button>
 				</div>
+				<details class="result">
+					<summary>SQLite scratchpad</summary>
+					<label>Read-only SQL
+						<textarea class="sql" id="sql">select name from sqlite_master where type = 'table' order by name;</textarea>
+					</label>
+					<div class="actions"><button id="runSql">Run SQL</button></div>
+				</details>
 				<div id="error" class="error" role="alert"></div>
 				<section id="answer"></section>
 				<section id="results"></section>
+				<section id="db"></section>
 			</main>
 
 			<aside class="card">
 				<h2>Index</h2>
 				<div class="stats" id="stats"></div>
+				<h2>DB tables</h2>
+				<div class="table-list" id="tables"></div>
 				<h2>Recent runs</h2>
 				<div id="runs"></div>
 			</aside>
@@ -949,6 +1089,30 @@ function renderZirpUi(options: ServeOptions) {
 
 		function renderHits(hits = []) {
 			$("results").innerHTML = hits.map((hit, index) => '<article class="result"><h3>' + (index + 1) + '. ' + escapeHtml(hit.title) + '</h3><div class="meta">' + escapeHtml(hit.tier + '/' + hit.kind) + ' · score ' + hit.score + '</div><div class="meta">' + escapeHtml(hit.sourcePath) + '</div><p>' + escapeHtml(hit.snippet) + '</p></article>').join("");
+		}
+
+		function renderRows(title, rows = []) {
+			if (!rows.length) {
+				$("db").innerHTML = '<article class="result"><h3>' + escapeHtml(title) + '</h3><p>No rows.</p></article>';
+				return;
+			}
+			const columns = Object.keys(rows[0]);
+			$("db").innerHTML = '<article class="result"><h3>' + escapeHtml(title) + '</h3><div class="table-wrap"><table><thead><tr>' + columns.map((column) => '<th>' + escapeHtml(column) + '</th>').join('') + '</tr></thead><tbody>' + rows.map((row) => '<tr>' + columns.map((column) => '<td title="' + escapeHtml(row[column]) + '">' + escapeHtml(row[column]) + '</td>').join('') + '</tr>').join('') + '</tbody></table></div></article>';
+		}
+
+		async function loadTable(name) {
+			const json = await fetch('/api/db/table?name=' + encodeURIComponent(name) + '&limit=50').then((r) => r.json());
+			renderRows('Table: ' + json.table, json.rows || []);
+		}
+
+		async function runSql() {
+			$("error").textContent = "";
+			try {
+				const json = await post('/api/db/query', { sql: $("sql").value });
+				renderRows('SQL result', json.rows || []);
+			} catch (error) {
+				$("error").textContent = error.message;
+			}
 		}
 
 		function renderAnswer(json) {
@@ -986,6 +1150,9 @@ function renderZirpUi(options: ServeOptions) {
 		async function loadSidebars() {
 			const stats = await fetch("/api/stats").then((r) => r.json());
 			$("stats").innerHTML = ['sources','chunks','runs'].map((key) => '<div class="stat"><span class="meta">' + key + '</span><strong>' + Number(stats[key] || 0).toLocaleString() + '</strong></div>').join("");
+			const tables = await fetch("/api/db/tables").then((r) => r.json());
+			$("tables").innerHTML = (tables.tables || []).map((table) => '<button class="table-button" data-table="' + escapeHtml(table.name) + '"><span>' + escapeHtml(table.name) + '</span><span class="meta">' + Number(table.count || 0).toLocaleString() + '</span></button>').join("");
+			for (const button of document.querySelectorAll('[data-table]')) button.addEventListener('click', () => loadTable(button.dataset.table));
 			const runs = await fetch("/api/runs").then((r) => r.json());
 			$("runs").innerHTML = (runs.runs || []).map((run) => '<div class="run"><div class="meta">' + escapeHtml(run.mode + ' · ' + (run.model || 'prompt')) + '</div><div>' + escapeHtml(run.query) + '</div></div>').join("") || '<p>No runs yet.</p>';
 		}
@@ -997,7 +1164,8 @@ function renderZirpUi(options: ServeOptions) {
 		$("ask").addEventListener("click", () => run("ask"));
 		$("search").addEventListener("click", () => run("search"));
 		$("prompt").addEventListener("click", () => run("prompt"));
-		$("clear").addEventListener("click", () => { $("answer").innerHTML = ""; $("results").innerHTML = ""; $("error").textContent = ""; });
+		$("runSql").addEventListener("click", runSql);
+		$("clear").addEventListener("click", () => { $("answer").innerHTML = ""; $("results").innerHTML = ""; $("db").innerHTML = ""; $("error").textContent = ""; });
 		$("query").addEventListener("keydown", (event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") run("ask"); });
 		loadSidebars();
 	</script>

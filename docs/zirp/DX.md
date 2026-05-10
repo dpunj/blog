@@ -124,7 +124,7 @@ If an API key is configured, this calls a model. If no key is found, it prints t
 bun zirp serve
 ```
 
-Then open `http://127.0.0.1:7331`. The cockpit gives you search, ask, prompt inspection, stats, and run history in one local UI.
+Then open `http://127.0.0.1:7331`. The cockpit gives you search, ask, prompt inspection, stats, run history, table browsing, and a read-only SQL scratchpad in one local UI.
 
 ## Model defaults
 

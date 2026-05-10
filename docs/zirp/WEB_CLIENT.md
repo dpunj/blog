@@ -17,6 +17,8 @@ It is intentionally local-only by default. The server binds to `127.0.0.1` unles
 - Show index stats.
 - Show recent `zirp_runs`.
 - Display source cards with snippets and paths.
+- Browse SQLite tables through a lightweight native `bun:sqlite` explorer.
+- Run read-only SQL scratchpad queries (`SELECT` / `WITH` / `PRAGMA`).
 
 ## Model behavior
 
@@ -33,10 +35,15 @@ The UI exposes provider/model/reasoning controls per request.
 ```txt
 GET  /api/stats
 GET  /api/runs
+GET  /api/db/tables
+GET  /api/db/table?name=zirp_sources&limit=50
+POST /api/db/query
 POST /api/search
 POST /api/prompt
 POST /api/ask
 ```
+
+The DB explorer uses Bun's native SQLite driver directly. Datasette is still great for deep external spelunking, but the cockpit has enough built-in DB access for quick local inspection.
 
 Example:
 
