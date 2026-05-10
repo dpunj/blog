@@ -88,7 +88,7 @@ const STOPWORDS = new Set([
 ]);
 
 function usage() {
-	console.log(`divesh_zirp v0
+	console.log(`divesh_zirp local oracle
 
 Commands:
   bun zirp inventory [--include-journal]
@@ -113,7 +113,14 @@ async function main() {
 	const cli = parseCliArgs(process.argv.slice(2));
 	const command = cli.positionals[0];
 
-	if (!command || command === "help" || command === "--help") {
+	if (
+		!command ||
+		command === "help" ||
+		command === "--help" ||
+		command === "-h" ||
+		cli.flags.has("help") ||
+		cli.flags.has("h")
+	) {
 		usage();
 		return;
 	}
@@ -342,6 +349,7 @@ function initZirpDb() {
 			mode TEXT NOT NULL,
 			model TEXT,
 			response_text TEXT,
+			retrieved_sources_json TEXT,
 			created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
 		);
 
@@ -363,6 +371,12 @@ function initZirpDb() {
 		CREATE INDEX IF NOT EXISTS idx_zirp_sources_type ON zirp_sources(source_type);
 		CREATE INDEX IF NOT EXISTS idx_zirp_chunks_source ON zirp_chunks(source_id);
 	`,
+	);
+	ensureColumn(
+		db,
+		"zirp_runs",
+		"retrieved_sources_json",
+		"ALTER TABLE zirp_runs ADD COLUMN retrieved_sources_json TEXT",
 	);
 	db.close();
 }
@@ -557,8 +571,9 @@ function recordZirpRun(
 	const indexedHits = hits.filter((hit) => hit.metadata?.chunkId);
 	const db = openKnowledgeDb();
 	const insertRun = db.prepare(`
-		INSERT INTO zirp_runs (id, query, mode, model, response_text, created_at)
-		VALUES (?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+		INSERT INTO zirp_runs (
+			id, query, mode, model, response_text, retrieved_sources_json, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
 	`);
 	const insertRunSource = db.prepare(`
 		INSERT INTO zirp_run_sources (run_id, chunk_id, rank, score)
@@ -567,7 +582,14 @@ function recordZirpRun(
 
 	const write = db.transaction(() => {
 		const runId = randomUUID();
-		insertRun.run(runId, query, mode, model ?? null, responseText ?? null);
+		insertRun.run(
+			runId,
+			query,
+			mode,
+			model ?? null,
+			responseText ?? null,
+			JSON.stringify(hits.map(toPublicHit)),
+		);
 		for (const [index, hit] of indexedHits.entries()) {
 			insertRunSource.run(
 				runId,
@@ -1216,6 +1238,20 @@ function runSqlScript(db: Database, sql: string) {
 	for (const statement of sql.split(";")) {
 		const trimmed = statement.trim();
 		if (trimmed) db.run(trimmed);
+	}
+}
+
+function ensureColumn(
+	db: Database,
+	tableName: string,
+	columnName: string,
+	alterSql: string,
+) {
+	const columns = db.query(`PRAGMA table_info("${tableName}")`).all() as {
+		name: string;
+	}[];
+	if (!columns.some((column) => column.name === columnName)) {
+		db.run(alterSql);
 	}
 }
 

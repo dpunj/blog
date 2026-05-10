@@ -48,17 +48,28 @@ The goal is not to build a generic chatbot. The goal is to make the corpus query
 - `docs/zirp/DX.md` — daily-use walkthrough, model config, golden queries, and troubleshooting.
 - `docs/zirp/WEB_CLIENT.md` — local web cockpit and public-facing oracle plan.
 
-## Commands
+## Canonical workflow
 
 ```bash
-bun zirp inventory
-bun zirp init-db
-bun zirp index
-bun zirp stats
-bun zirp serve
+bun sync api --export-library  # remote APIs → data/knowledge.db → public/data/library.json
+bun zirp inventory             # dry-run: what the oracle sees now
+bun zirp index                 # rebuild zirp_* tables
+bun zirp stats                 # inspect indexed corpus
+bun zirp serve                 # local cockpit + SQLite explorer
+```
+
+Use it:
+
+```bash
 bun zirp search "games as training grounds"
 bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
+```
+
+Help:
+
+```bash
+bun zirp -h
 ```
 
 `ask` defaults to OpenAI `gpt-5.5` with reasoning effort `low` when `OPENAI_API_KEY` is present. If OpenAI is not configured, it falls back to Anthropic when `ANTHROPIC_API_KEY` is present. If no key is configured, it prints the generated prompt so it can be pasted into any model.

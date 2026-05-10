@@ -12,14 +12,15 @@ Personal blog built with [Astro](https://astro.build).
 | `bun dev` | Start dev server at `localhost:4321` |
 | `bun build` | Build production site to `./dist/` |
 | `bun preview` | Preview build locally |
-| `bun sync api --export-library` | Sync Readwise/Zotero/etc. and export `/library` data |
+| `bun sync api --export-library` | Fetch API sources into `data/knowledge.db`, then export `/library` data |
+| `bun sync --export-library` | Export current `data/knowledge.db` to `/library` data without fetching APIs |
 | `bun sync --stats` | Show local knowledge DB stats |
 | `bun zirp inventory` | Inventory the local `divesh_zirp` corpus |
 | `bun zirp init-db` | Create namespaced `zirp_*` tables in `data/knowledge.db` |
 | `bun zirp index` | Build the local SQLite/FTS oracle index |
 | `bun zirp serve` | Open the local `divesh_zirp` web cockpit + SQLite explorer on `127.0.0.1:7331` |
 | `bun zirp search "games as training grounds"` | Search the personal oracle corpus |
-| `bun zirp ask "what should I write next?"` | Ask the oracle; uses Anthropic if configured, otherwise prints the prompt |
+| `bun zirp ask "what should I write next?"` | Ask the oracle; uses OpenAI/Anthropic if configured, otherwise prints the prompt |
 
 ## Linting & Formatting
 
@@ -91,15 +92,21 @@ Notes:
 
 ### Personal Oracle (`divesh_zirp`)
 
-A local-first personal oracle inspired by `vgr_zirp`. It retrieves from blog posts, selected notes, Versa context, Readwise/Zotero metadata, Goodreads, and Spotify, then composes grounded prompts using explicit persona docs in `docs/zirp/`.
+Local-first oracle inspired by `vgr_zirp`. It indexes blog posts, selected notes, Versa context, Readwise/Zotero metadata, Goodreads, and Spotify into `zirp_*` tables inside `data/knowledge.db`.
+
+Canonical refresh:
 
 ```bash
-bun zirp inventory
-bun zirp init-db
-bun zirp index
-bun zirp stats
-bun zirp serve
-bun zirp datasette
+bun sync api --export-library  # remote APIs → data/knowledge.db → public/data/library.json
+bun zirp inventory             # dry-run: what ZIRP sees now
+bun zirp index                 # write/rebuild zirp_* tables
+bun zirp stats                 # inspect indexed corpus
+bun zirp serve                 # local cockpit + SQLite explorer
+```
+
+Use it:
+
+```bash
 bun zirp search "games as training grounds"
 bun zirp prompt "connect WoW, feedback loops, and Versa"
 bun zirp ask "what should I write next?"
@@ -107,7 +114,7 @@ bun zirp ask "what should I write next?"
 
 Privacy defaults: `journal/` is excluded unless `--include-journal` is passed; API calls only happen when a model API key is configured. `ask` defaults to OpenAI `gpt-5.5` with reasoning effort `low` when `OPENAI_API_KEY` is present, with Anthropic fallback.
 
-See `docs/zirp/README.md`, `docs/zirp/DX.md`, `docs/zirp/WEB_CLIENT.md`, and `docs/zirp/ARCHITECTURE.md`.
+See `docs/zirp/DX.md` for the canonical runbook.
 
 ## Content
 
