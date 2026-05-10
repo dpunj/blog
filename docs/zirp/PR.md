@@ -90,12 +90,14 @@ Both pass.
 
 ## Follow-up
 
-The obvious next move is a dedicated local SQLite index at `data/zirp.db`:
+The obvious next move is a dedicated ZIRP layer inside the existing `data/knowledge.db`:
 
-- normalized source and chunk tables;
+- namespaced `zirp_*` source and chunk tables;
 - FTS5 search;
 - source hashing and incremental indexing;
 - prompt run logging;
 - later: embeddings via `sqlite-vec` or a compatible vector layer.
+
+This keeps one local knowledge DB while clearly separating synced source data from derived oracle index data.
 
 See `docs/zirp/SQLITE_PLAN.md`.

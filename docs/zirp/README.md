@@ -44,7 +44,7 @@ The goal is not to build a generic chatbot. The goal is to make the corpus query
 - `docs/zirp/STYLE.md` — seed writing/answer style guide.
 - `docs/zirp/LEXICON.md` — seed glossary of recurring personal concepts.
 - `docs/zirp/ARCHITECTURE.md` — technical architecture and corpus tiering.
-- `docs/zirp/SQLITE_PLAN.md` — follow-up plan for a dedicated SQLite-backed ZIRP store.
+- `docs/zirp/SQLITE_PLAN.md` — follow-up plan for namespaced ZIRP tables in the existing SQLite DB.
 
 ## Commands
 
@@ -80,4 +80,4 @@ bun zirp ask "what should I write next?"
 
 v0 retrieval is weighted lexical search, not embeddings. This is good enough to make the thing real, but it will miss semantically related sources that do not share words with the query.
 
-The next obvious move is a dedicated SQLite-backed ZIRP index with normalized sources, chunks, retrieval runs, and eventually embeddings. See [[SQLITE_PLAN]] / `SQLITE_PLAN.md`.
+The next obvious move is a SQLite-backed ZIRP index using separate `zirp_*` tables inside the existing `data/knowledge.db`: normalized sources, chunks, retrieval runs, and eventually embeddings. See `SQLITE_PLAN.md`.
