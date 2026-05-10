@@ -14,6 +14,7 @@
 		"lint:fix": "biome check --write .",
 		"format": "biome format --write .",
 		"db": "bun scripts/db.ts",
+		"zirp": "bun scripts/zirp.ts",
 		"sync": "bun scripts/sync.ts",
 		"sync:local": "bun scripts/sync.ts local",
 		"sync:api": "bun scripts/sync.ts api",
