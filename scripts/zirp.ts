@@ -95,12 +95,14 @@ Commands:
   bun zirp init-db
   bun zirp index [--include-journal]
   bun zirp stats
+  bun zirp serve [--host 127.0.0.1] [--port 7331]
   bun zirp search <query> [--limit 8] [--include-journal] [--memory]
   bun zirp prompt <query> [--include-journal] [--memory]
   bun zirp ask <query> [--include-journal] [--memory] [--provider openai|anthropic] [--model gpt-5.5] [--reasoning-effort low]
 
 Notes:
   - journal/ is excluded unless --include-journal is passed.
+  - serve binds to 127.0.0.1 by default for privacy.
   - search/prompt/ask prefer the SQLite index when available; use --memory to force v0 in-memory search.
   - ask defaults to OpenAI GPT-5.5 with reasoning effort low when OPENAI_API_KEY is present.
   - set ZIRP_PROVIDER/ZIRP_MODEL/ZIRP_REASONING_EFFORT or pass flags to override.
@@ -139,6 +141,14 @@ async function main() {
 
 	if (command === "stats") {
 		printZirpStats();
+		return;
+	}
+
+	if (command === "serve") {
+		const host = cli.values.get("host") ?? "127.0.0.1";
+		const requestedPort = Number(cli.values.get("port") ?? 7331);
+		const port = Number.isFinite(requestedPort) ? requestedPort : 7331;
+		serveZirp({ host, port, includeJournal, forceMemory, modelConfig });
 		return;
 	}
 
@@ -615,6 +625,397 @@ function printZirpStats() {
 	} finally {
 		db.close();
 	}
+}
+
+type ServeOptions = {
+	host: string;
+	port: number;
+	includeJournal: boolean;
+	forceMemory: boolean;
+	modelConfig: ModelConfig;
+};
+
+function serveZirp(options: ServeOptions) {
+	const server = Bun.serve({
+		hostname: options.host,
+		port: options.port,
+		async fetch(request) {
+			const url = new URL(request.url);
+			try {
+				if (url.pathname === "/") return htmlResponse(renderZirpUi(options));
+				if (url.pathname === "/api/stats") return jsonResponse(getZirpStats());
+				if (url.pathname === "/api/runs") return jsonResponse(getRecentRuns());
+				if (url.pathname === "/api/search" && request.method === "POST") {
+					const body = await readJsonBody(request);
+					const query = String(body.query ?? "").trim();
+					const limit = readApiLimit(body.limit);
+					const hits = search(
+						query,
+						limit,
+						options.includeJournal,
+						Boolean(body.memory ?? options.forceMemory),
+					);
+					recordZirpRun("search", query, hits);
+					return jsonResponse({ hits: hits.map(toPublicHit) });
+				}
+				if (url.pathname === "/api/prompt" && request.method === "POST") {
+					const body = await readJsonBody(request);
+					const query = String(body.query ?? "").trim();
+					const limit = readApiLimit(body.limit);
+					const hits = search(
+						query,
+						limit,
+						options.includeJournal,
+						Boolean(body.memory ?? options.forceMemory),
+					);
+					const prompt = buildPrompt(query, hits);
+					recordZirpRun("prompt", query, hits);
+					return jsonResponse({ ...prompt, hits: hits.map(toPublicHit) });
+				}
+				if (url.pathname === "/api/ask" && request.method === "POST") {
+					const body = await readJsonBody(request);
+					const query = String(body.query ?? "").trim();
+					const limit = readApiLimit(body.limit);
+					const requestModel = getRequestModelConfig(body, options.modelConfig);
+					const hits = search(
+						query,
+						limit,
+						options.includeJournal,
+						Boolean(body.memory ?? options.forceMemory),
+					);
+					const prompt = buildPrompt(query, hits);
+					const answer = await callModel(prompt, requestModel);
+					recordZirpRun(
+						"ask",
+						query,
+						hits,
+						answer,
+						formatModelLabel(requestModel),
+					);
+					return jsonResponse({
+						answer,
+						prompt: answer ? undefined : prompt,
+						hits: hits.map(toPublicHit),
+						model: formatModelLabel(requestModel),
+						noKey: !answer,
+					});
+				}
+				return new Response("Not found", { status: 404 });
+			} catch (error) {
+				return jsonResponse(
+					{ error: error instanceof Error ? error.message : String(error) },
+					500,
+				);
+			}
+		},
+	});
+
+	console.log(
+		`divesh_zirp cockpit listening on http://${server.hostname}:${server.port}`,
+	);
+	console.log(
+		"Local-only by default. Use --host 0.0.0.0 only if you know what you are exposing.",
+	);
+}
+
+function getRequestModelConfig(
+	body: Record<string, unknown>,
+	fallback: ModelConfig,
+): ModelConfig {
+	return {
+		provider: normalizeProvider(
+			typeof body.provider === "string" ? body.provider : fallback.provider,
+		),
+		model: normalizeModelName(
+			typeof body.model === "string" ? body.model : fallback.model,
+		),
+		reasoningEffort: normalizeReasoningEffort(
+			typeof body.reasoningEffort === "string"
+				? body.reasoningEffort
+				: fallback.reasoningEffort,
+		),
+	};
+}
+
+async function readJsonBody(request: Request) {
+	if (!request.body) return {} as Record<string, unknown>;
+	return (await request.json()) as Record<string, unknown>;
+}
+
+function readApiLimit(value: unknown) {
+	const limit = Number(value ?? 8);
+	if (!Number.isFinite(limit)) return 8;
+	return Math.max(1, Math.min(20, limit));
+}
+
+function toPublicHit(hit: SearchHit) {
+	return {
+		id: hit.id,
+		title: hit.title,
+		sourcePath: hit.sourcePath,
+		tier: hit.tier,
+		kind: hit.kind,
+		score: Number(hit.score.toFixed(2)),
+		snippet: hit.snippet,
+	};
+}
+
+function getZirpStats() {
+	if (!existsSync(KNOWLEDGE_DB_PATH) || !hasZirpTables()) {
+		return { initialized: false, sources: 0, chunks: 0, runs: 0, tiers: [] };
+	}
+	const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+		readonly: true,
+	});
+	try {
+		const sources = db
+			.query("SELECT count(*) AS count FROM zirp_sources")
+			.get() as { count: number };
+		const chunks = db
+			.query("SELECT count(*) AS count FROM zirp_chunks")
+			.get() as { count: number };
+		const runs = db.query("SELECT count(*) AS count FROM zirp_runs").get() as {
+			count: number;
+		};
+		const tiers = db
+			.query(`
+				SELECT tier, source_type AS sourceType, count(*) AS count
+				FROM zirp_sources
+				GROUP BY tier, source_type
+				ORDER BY count DESC
+			`)
+			.all() as { tier: string; sourceType: string; count: number }[];
+		return {
+			initialized: true,
+			sources: sources.count,
+			chunks: chunks.count,
+			runs: runs.count,
+			tiers,
+		};
+	} finally {
+		db.close();
+	}
+}
+
+function getRecentRuns() {
+	if (!existsSync(KNOWLEDGE_DB_PATH) || !hasZirpTables()) return { runs: [] };
+	const db = new Database(`file:${KNOWLEDGE_DB_PATH}?mode=ro&immutable=1`, {
+		readonly: true,
+	});
+	try {
+		const runs = db
+			.query(`
+				SELECT id, created_at AS createdAt, mode, model, query
+				FROM zirp_runs
+				ORDER BY created_at DESC
+				LIMIT 20
+			`)
+			.all() as {
+			id: string;
+			createdAt: string;
+			mode: string;
+			model: string | null;
+			query: string;
+		}[];
+		return { runs };
+	} finally {
+		db.close();
+	}
+}
+
+function htmlResponse(html: string) {
+	return new Response(html, {
+		headers: { "content-type": "text/html; charset=utf-8" },
+	});
+}
+
+function jsonResponse(body: unknown, status = 200) {
+	return new Response(JSON.stringify(body), {
+		status,
+		headers: { "content-type": "application/json; charset=utf-8" },
+	});
+}
+
+function renderZirpUi(options: ServeOptions) {
+	return `<!doctype html>
+<html lang="en">
+<head>
+	<meta charset="utf-8" />
+	<meta name="viewport" content="width=device-width, initial-scale=1" />
+	<title>divesh_zirp cockpit</title>
+	<style>
+		:root { color-scheme: dark; --bg: #020617; --panel: #0f172a; --panel-2: #111827; --text: #e5e7eb; --muted: #94a3b8; --line: #1f2937; --accent: #38bdf8; --danger: #f87171; }
+		* { box-sizing: border-box; }
+		body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.5 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; }
+		button, input, textarea, select { font: inherit; }
+		button { border: 1px solid var(--line); border-radius: 12px; padding: 10px 14px; background: var(--panel-2); color: var(--text); cursor: pointer; }
+		button:hover { border-color: var(--accent); }
+		button.primary { background: var(--accent); border-color: var(--accent); color: #082f49; font-weight: 700; }
+		button:disabled { cursor: wait; opacity: 0.6; }
+		textarea, input, select { width: 100%; border: 1px solid var(--line); border-radius: 14px; background: #020617; color: var(--text); padding: 12px; }
+		textarea { min-height: 120px; resize: vertical; }
+		label { display: grid; gap: 6px; color: var(--muted); font-size: 13px; }
+		code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+		.shell { max-width: 1180px; margin: 0 auto; padding: 32px 20px 48px; }
+		.header { display: flex; justify-content: space-between; gap: 20px; align-items: flex-start; margin-bottom: 24px; }
+		.eyebrow { color: var(--accent); font-size: 13px; font-weight: 700; text-transform: uppercase; }
+		h1 { margin: 4px 0 8px; font-size: clamp(32px, 6vw, 72px); line-height: 0.95; letter-spacing: -0.04em; }
+		p { color: var(--muted); max-width: 760px; }
+		.grid { display: grid; grid-template-columns: minmax(0, 1.4fr) minmax(280px, 0.6fr); gap: 18px; align-items: start; }
+		.card { border: 1px solid var(--line); border-radius: 22px; background: var(--panel); padding: 18px; }
+		.controls { display: grid; grid-template-columns: 1fr 150px 160px 110px; gap: 10px; margin: 12px 0; }
+		.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+		.stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+		.stat { border: 1px solid var(--line); border-radius: 16px; padding: 12px; background: #020617; }
+		.stat strong { display: block; font-size: 22px; font-variant-numeric: tabular-nums; }
+		.result { border: 1px solid var(--line); border-radius: 16px; padding: 14px; margin-top: 12px; background: #020617; }
+		.result h3 { margin: 0 0 6px; font-size: 16px; }
+		.meta { color: var(--muted); font-size: 12px; font-variant-numeric: tabular-nums; }
+		.answer { white-space: pre-wrap; }
+		.prompt { max-height: 420px; overflow: auto; white-space: pre-wrap; }
+		.error { color: var(--danger); margin-top: 10px; }
+		.run { border-top: 1px solid var(--line); padding: 10px 0; }
+		.run:first-child { border-top: 0; }
+		@media (max-width: 880px) { .header, .grid { display: block; } .controls { grid-template-columns: 1fr; } .card { margin-top: 16px; } }
+	</style>
+</head>
+<body>
+	<div class="shell">
+		<header class="header">
+			<div>
+				<div class="eyebrow">local private cockpit</div>
+				<h1>divesh_zirp</h1>
+				<p>Search, prompt, and ask your local corpus. SQLite FTS first, persona docs on top, OpenAI 5.5 low by default when configured.</p>
+			</div>
+			<div class="card">
+				<div class="meta">Host</div>
+				<strong>${escapeHtml(options.host)}:${options.port}</strong>
+				<div class="meta">Model default</div>
+				<strong>${escapeHtml(formatModelLabel(options.modelConfig))}</strong>
+			</div>
+		</header>
+
+		<div class="grid">
+			<main class="card">
+				<label>Question
+					<textarea id="query">what is the hidden game I keep trying to play?</textarea>
+				</label>
+				<div class="controls">
+					<label>Provider<select id="provider"><option value="openai">openai</option><option value="anthropic">anthropic</option></select></label>
+					<label>Model<input id="model" value="${escapeHtml(options.modelConfig.model)}" /></label>
+					<label>Reasoning<select id="reasoning"><option>minimal</option><option selected>low</option><option>medium</option><option>high</option></select></label>
+					<label>Limit<input id="limit" type="number" min="1" max="20" value="8" /></label>
+				</div>
+				<div class="actions">
+					<button class="primary" id="ask">Ask</button>
+					<button id="search">Search</button>
+					<button id="prompt">Prompt</button>
+					<button id="clear">Clear</button>
+				</div>
+				<div id="error" class="error" role="alert"></div>
+				<section id="answer"></section>
+				<section id="results"></section>
+			</main>
+
+			<aside class="card">
+				<h2>Index</h2>
+				<div class="stats" id="stats"></div>
+				<h2>Recent runs</h2>
+				<div id="runs"></div>
+			</aside>
+		</div>
+	</div>
+
+	<script>
+		const $ = (id) => document.getElementById(id);
+		const provider = $("provider");
+		provider.value = "${options.modelConfig.provider}";
+		$("reasoning").value = "${options.modelConfig.reasoningEffort}";
+
+		async function post(path, body) {
+			const response = await fetch(path, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify(body) });
+			const json = await response.json();
+			if (!response.ok) throw new Error(json.error || "Request failed");
+			return json;
+		}
+
+		function payload() {
+			return { query: $("query").value, limit: Number($("limit").value || 8), provider: provider.value, model: $("model").value, reasoningEffort: $("reasoning").value };
+		}
+
+		function setBusy(busy) {
+			for (const id of ["ask", "search", "prompt"]) $(id).disabled = busy;
+		}
+
+		function renderHits(hits = []) {
+			$("results").innerHTML = hits.map((hit, index) => '<article class="result"><h3>' + (index + 1) + '. ' + escapeHtml(hit.title) + '</h3><div class="meta">' + escapeHtml(hit.tier + '/' + hit.kind) + ' · score ' + hit.score + '</div><div class="meta">' + escapeHtml(hit.sourcePath) + '</div><p>' + escapeHtml(hit.snippet) + '</p></article>').join("");
+		}
+
+		function renderAnswer(json) {
+			if (json.noKey) {
+				$("answer").innerHTML = '<article class="result"><h3>No API key found. Prompt generated instead.</h3><pre class="prompt">' + escapeHtml('# SYSTEM\\n\\n' + json.prompt.system + '\\n\\n# USER\\n\\n' + json.prompt.user) + '</pre></article>';
+			} else {
+				$("answer").innerHTML = '<article class="result"><h3>Answer</h3><div class="meta">' + escapeHtml(json.model || '') + '</div><div class="answer">' + escapeHtml(json.answer || '') + '</div></article>';
+			}
+			renderHits(json.hits);
+		}
+
+		async function run(mode) {
+			$("error").textContent = "";
+			setBusy(true);
+			try {
+				if (mode === "search") {
+					const json = await post("/api/search", payload());
+					$("answer").innerHTML = "";
+					renderHits(json.hits);
+				} else if (mode === "prompt") {
+					const json = await post("/api/prompt", payload());
+					$("answer").innerHTML = '<article class="result"><h3>Prompt</h3><pre class="prompt">' + escapeHtml('# SYSTEM\\n\\n' + json.system + '\\n\\n# USER\\n\\n' + json.user) + '</pre></article>';
+					renderHits(json.hits);
+				} else {
+					renderAnswer(await post("/api/ask", payload()));
+				}
+				await loadSidebars();
+			} catch (error) {
+				$("error").textContent = error.message;
+			} finally {
+				setBusy(false);
+			}
+		}
+
+		async function loadSidebars() {
+			const stats = await fetch("/api/stats").then((r) => r.json());
+			$("stats").innerHTML = ['sources','chunks','runs'].map((key) => '<div class="stat"><span class="meta">' + key + '</span><strong>' + Number(stats[key] || 0).toLocaleString() + '</strong></div>').join("");
+			const runs = await fetch("/api/runs").then((r) => r.json());
+			$("runs").innerHTML = (runs.runs || []).map((run) => '<div class="run"><div class="meta">' + escapeHtml(run.mode + ' · ' + (run.model || 'prompt')) + '</div><div>' + escapeHtml(run.query) + '</div></div>').join("") || '<p>No runs yet.</p>';
+		}
+
+		function escapeHtml(value) {
+			return String(value ?? "").replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[char]));
+		}
+
+		$("ask").addEventListener("click", () => run("ask"));
+		$("search").addEventListener("click", () => run("search"));
+		$("prompt").addEventListener("click", () => run("prompt"));
+		$("clear").addEventListener("click", () => { $("answer").innerHTML = ""; $("results").innerHTML = ""; $("error").textContent = ""; });
+		$("query").addEventListener("keydown", (event) => { if ((event.metaKey || event.ctrlKey) && event.key === "Enter") run("ask"); });
+		loadSidebars();
+	</script>
+</body>
+</html>`;
+}
+
+function escapeHtml(value: string | number) {
+	return String(value).replace(/[&<>"']/g, (char) => {
+		const entities: Record<string, string> = {
+			"&": "&amp;",
+			"<": "&lt;",
+			">": "&gt;",
+			'"': "&quot;",
+			"'": "&#39;",
+		};
+		return entities[char] ?? char;
+	});
 }
 
 function hasZirpTables() {

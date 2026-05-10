@@ -42,6 +42,13 @@ bun zirp index
 bun zirp stats
 ```
 
+Open the local cockpit:
+
+```bash
+bun zirp serve
+# http://127.0.0.1:7331
+```
+
 Expected shape after indexing:
 
 ```txt
@@ -110,6 +117,14 @@ bun zirp ask "what is the hidden game I keep trying to play?"
 ```
 
 If an API key is configured, this calls a model. If no key is found, it prints the prompt instead.
+
+### Use the web cockpit
+
+```bash
+bun zirp serve
+```
+
+Then open `http://127.0.0.1:7331`. The cockpit gives you search, ask, prompt inspection, stats, and run history in one local UI.
 
 ## Model defaults
 
