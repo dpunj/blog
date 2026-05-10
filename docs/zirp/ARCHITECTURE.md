@@ -32,7 +32,8 @@ The indexed path:
 4. Mirror searchable text into `zirp_chunks_fts` using SQLite FTS5.
 5. Search FTS5, then re-rank candidates with title/text lexical scoring and tier weights.
 6. Dedupe by source and return top snippets.
-7. Log search/prompt/ask runs in `zirp_runs` and `zirp_run_sources` when indexed chunks are used.
+7. Log durable query/answer history in `zirp_runs`, including a JSON snapshot of retrieved sources.
+8. Log current-index chunk links in `zirp_run_sources` when indexed chunks are used.
 
 Use `--memory` to force the original in-memory search path.
 
@@ -55,7 +56,8 @@ bun zirp ask "what should I write next?"
 
 - Does not index `journal/` unless `--include-journal` is passed.
 - Does not modify notes or source data.
-- Writes only derived `zirp_*` tables inside `~/code/blog/data/knowledge.db` for indexing/run logs.
+- Writes only namespaced `zirp_*` tables inside `~/code/blog/data/knowledge.db` for indexing/run logs.
+- `bun zirp index` preserves `zirp_runs` conversation history, but rebuilds retrieval tables and current-index source links.
 - Keeps existing source-of-truth tables (`resources`, `tags`, `resource_tags`, `sync_state`) untouched.
 - Search/prompt/ask read the SQLite index when available; `--memory` bypasses it.
 - API calls are opt-in via environment variables.

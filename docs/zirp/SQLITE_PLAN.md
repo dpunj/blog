@@ -175,12 +175,14 @@ bun zirp ask "what should I write next?"
 - Default index excludes `journal/`.
 - Legal/data archive folders stay excluded.
 - Keep sensitive path rules in `zirp_exclusions`.
-- `zirp_*` tables are derived and can be dropped/rebuilt.
+- Retrieval tables (`zirp_sources`, `zirp_chunks`, `zirp_chunks_fts`, `zirp_embeddings`, `zirp_run_sources`) are derived and can be rebuilt.
+- `zirp_runs` is durable run/conversation history and should be preserved across normal `bun zirp index` runs.
+- New `zirp_runs` rows store `retrieved_sources_json` so answer/source snapshots survive index rebuilds.
 - The canonical synced library remains `resources` + `sync_state`.
 
 ## Migration safety
 
-Because the ZIRP layer is namespaced, reset is simple:
+Because the ZIRP layer is namespaced, hard reset is simple. This deletes run history too:
 
 ```sql
 DROP TABLE IF EXISTS zirp_run_sources;

@@ -264,14 +264,33 @@ Treat this as spicy mode. Rebuild without it when done:
 bun zirp index
 ```
 
+## Data safety
+
+`bun zirp index` is safe to rerun.
+
+Preserved:
+
+- source-of-truth library tables: `resources`, `tags`, `resource_tags`, `sync_state`;
+- source files: blog posts, notes, Goodreads CSV, Spotify JSON;
+- run/conversation records in `zirp_runs`.
+
+Rebuilt:
+
+- `zirp_sources`;
+- `zirp_chunks`;
+- `zirp_chunks_fts`;
+- `zirp_embeddings`;
+- `zirp_run_sources` link rows.
+
+Why `zirp_run_sources` is rebuilt/cleared: those rows point at chunk IDs from the current index. `zirp_runs` stores the durable query/answer history, plus a JSON snapshot of retrieved sources for new runs.
+
 ## Reset / rebuild
 
-Rebuild derived ZIRP tables without touching source-of-truth library tables:
+Soft reset derived retrieval tables without touching source-of-truth library tables or run history:
 
 ```bash
 sqlite3 data/knowledge.db <<'SQL'
 DELETE FROM zirp_run_sources;
-DELETE FROM zirp_runs;
 DELETE FROM zirp_embeddings;
 DELETE FROM zirp_chunks_fts;
 DELETE FROM zirp_chunks;
@@ -281,7 +300,7 @@ SQL
 bun zirp index
 ```
 
-Hard reset schema:
+Hard reset schema, including run history:
 
 ```bash
 sqlite3 data/knowledge.db <<'SQL'
